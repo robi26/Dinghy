@@ -1,0 +1,13 @@
+# Toolchains (project-local, not committed)
+/toolchains/
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+/app/libs/*.aar
+
+# Go
+/core/build/

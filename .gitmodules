@@ -1,0 +1,3 @@
+[submodule "external/sushitrain"]
+	path = external/sushitrain
+	url = https://github.com/pixelspark/sushitrain
