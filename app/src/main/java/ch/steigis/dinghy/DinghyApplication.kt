@@ -1,9 +1,9 @@
-package dev.sidecar
+package ch.steigis.dinghy
 
 import android.app.Application
 import go.Seq
 
-class SidecarApplication : Application() {
+class DinghyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // gomobile's Go runtime needs an application context for the parts of

@@ -1,4 +1,4 @@
-package dev.sidecar.service
+package ch.steigis.dinghy.service
 
 import android.content.Context
 import android.net.wifi.WifiManager
@@ -60,6 +60,6 @@ class DiscoveryLock(context: Context) {
     }
 
     private companion object {
-        const val TAG = "sidecar-discovery"
+        const val TAG = "dinghy-discovery"
     }
 }

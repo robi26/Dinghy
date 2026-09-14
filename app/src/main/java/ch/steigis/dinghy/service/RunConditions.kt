@@ -1,4 +1,4 @@
-package dev.sidecar.service
+package ch.steigis.dinghy.service
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +9,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.BatteryManager
-import dev.sidecar.settings.Settings
+import ch.steigis.dinghy.settings.Settings
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive

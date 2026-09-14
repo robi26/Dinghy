@@ -1,4 +1,4 @@
-package dev.sidecar.engine
+package ch.steigis.dinghy.engine
 
 /** Lifecycle of the embedded Syncthing node. */
 sealed interface EngineState {

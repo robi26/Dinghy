@@ -1,29 +1,30 @@
-# Sidecar
+# Dinghy
 
 A Syncthing client for Android with a **browsable index and on-demand downloads**:
 the phone holds the complete file tree without holding the file data, and you pull
 individual files when you want them.
 
-This is the model [Synctrain](https://github.com/pixelspark/sushitrain) provides on
-iOS. No maintained Android app offers it — Syncthing-Fork and BasicSync run the
+The same model exists on iOS, built on the engine this app also uses. No
+maintained Android app offers it — Syncthing-Fork and BasicSync run the
 normal daemon (everything you subscribe to lands on disk), and Syncthing Lite, which
 did work this way, has been unmaintained since 2019.
 
 ## How it works
 
-The sync engine is **SushitrainCore** — Synctrain's Go engine, used unmodified. It is
+The sync engine is **SushitrainCore**, the Go engine from
+[pixelspark/sushitrain](https://github.com/pixelspark/sushitrain), used unmodified. It is
 platform-neutral Go (no cgo, no build tags, pure-Go SQLite), so `gomobile` binds it to
-Android exactly as Synctrain binds it to iOS. Selective sync is `.stignore` rewriting;
+Android exactly as the upstream project binds it to iOS. Selective sync is `.stignore` rewriting;
 on-demand reads are served by a localhost HTTP server backed by a block puller that
 fetches from peers on demand, which is what makes HTTP Range requests over
 not-yet-downloaded files work.
 
-Sidecar supplies the Android half: a Compose UI and a `DocumentsProvider` so synced
+Dinghy supplies the Android half: a Compose UI and a `DocumentsProvider` so synced
 folders appear in the system file picker, with files materialized on first read.
 
 ```
 Kotlin/Compose UI ─┐
-DocumentsProvider ─┼─► SyncEngine ──► sidecar-core.aar (gomobile)
+DocumentsProvider ─┼─► SyncEngine ──► dinghy-core.aar (gomobile)
 Foreground service ┘                      │
                               ┌───────────┴───────────┐
                          Syncthing node        StreamingServer
@@ -78,7 +79,7 @@ file.
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-apksigner verify --print-certs sidecar-<version>-<abi>.apk
+apksigner verify --print-certs dinghy-<version>-<abi>.apk
 ```
 
 The signing certificate's SHA-256 digest should match the one published with the
@@ -92,8 +93,8 @@ the signature is verified in the job, and the APKs are attached to the GitHub
 release along with the Obtainium manifest and checksums.
 
 Signing credentials come from repository secrets:
-`SIDECAR_KEYSTORE_BASE64`, `SIDECAR_KEYSTORE_PASSWORD`, `SIDECAR_KEY_ALIAS` and
-`SIDECAR_KEY_PASSWORD`. Locally, put the same values in `keystore.properties`
+`DINGHY_KEYSTORE_BASE64`, `DINGHY_KEYSTORE_PASSWORD`, `DINGHY_KEY_ALIAS` and
+`DINGHY_KEY_PASSWORD`. Locally, put the same values in `keystore.properties`
 (gitignored); without it a release build still runs, just unsigned, which is
 enough to check that R8 is happy.
 
@@ -114,17 +115,17 @@ repository accepts upstream-signed APKs and is the more realistic next step.
 
 ## Licensing
 
-Sidecar is **GPL-3.0**. SushitrainCore is **MPL-2.0** and stays under its own license;
+Dinghy is **GPL-3.0**. SushitrainCore is **MPL-2.0** and stays under its own license;
 its headers carry the standard MPL notice, not the "Incompatible With Secondary
 Licenses" one, so the combination is permitted.
 
-The Synctrain name and logo are **not** covered by that license — they are reserved by
-its author. Sidecar is an independent app and uses neither.
+The upstream project's own app name and logo are **not** covered by that license —
+they are reserved by its author. Dinghy is an independent app and uses neither.
 
 ## Credits
 
-- [Synctrain / sushitrain](https://github.com/pixelspark/sushitrain) by Tommy van der
-  Vorst — the sync engine and the interaction model.
+- [pixelspark/sushitrain](https://github.com/pixelspark/sushitrain) by Tommy van der
+  Vorst — SushitrainCore, the sync engine, and the interaction model it pioneered.
 - [BasicSync](https://github.com/chenxiaolong/BasicSync) by chenxiaolong — the
   reference for running Syncthing via gomobile on modern Android.
 - [Syncthing](https://syncthing.net/).

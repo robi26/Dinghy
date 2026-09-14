@@ -1,4 +1,4 @@
-package dev.sidecar.ui
+package ch.steigis.dinghy.ui
 
 import android.Manifest
 import android.content.ClipData
@@ -44,12 +44,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.sidecar.R
-import dev.sidecar.binding.core.Core
-import dev.sidecar.engine.EngineState
-import dev.sidecar.engine.SyncEngine
-import dev.sidecar.service.SyncService
-import dev.sidecar.settings.Settings
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.binding.core.Core
+import ch.steigis.dinghy.engine.EngineState
+import ch.steigis.dinghy.engine.SyncEngine
+import ch.steigis.dinghy.service.SyncService
+import ch.steigis.dinghy.settings.Settings
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SidecarApp()
+                    DinghyApp()
                 }
             }
         }
@@ -80,7 +80,7 @@ private sealed interface Screen {
 }
 
 @Composable
-private fun SidecarApp() {
+private fun DinghyApp() {
     var stack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Status)) }
     val current = stack.last()
 
@@ -131,7 +131,7 @@ private fun SidecarApp() {
 }
 
 @Composable
-private fun StatusScreen(onOpenFolder: (dev.sidecar.engine.FolderInfo) -> Unit) {
+private fun StatusScreen(onOpenFolder: (ch.steigis.dinghy.engine.FolderInfo) -> Unit) {
     val context = LocalContext.current
     val state by SyncEngine.state.collectAsStateWithLifecycle()
 
@@ -142,7 +142,7 @@ private fun StatusScreen(onOpenFolder: (dev.sidecar.engine.FolderInfo) -> Unit) 
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Sidecar", style = MaterialTheme.typography.headlineMedium)
+        Text("Dinghy", style = MaterialTheme.typography.headlineMedium)
 
         SetupWarnings()
 

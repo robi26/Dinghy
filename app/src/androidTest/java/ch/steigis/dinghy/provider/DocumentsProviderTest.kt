@@ -1,12 +1,12 @@
-package dev.sidecar.provider
+package ch.steigis.dinghy.provider
 
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.sidecar.engine.EngineState
-import dev.sidecar.engine.SyncEngine
+import ch.steigis.dinghy.engine.EngineState
+import ch.steigis.dinghy.engine.SyncEngine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -144,7 +144,7 @@ class DocumentsProviderTest {
     }
 
     private companion object {
-        const val AUTHORITY = "dev.sidecar.documents"
+        const val AUTHORITY = "ch.steigis.dinghy.documents"
         const val READ_AT = 5_000_000L
         const val READ_LENGTH = 4096
         const val PEER_TIMEOUT_MS = 60_000L

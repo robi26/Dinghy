@@ -1,11 +1,11 @@
-package dev.sidecar.service
+package ch.steigis.dinghy.service
 
 import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import dev.sidecar.R
-import dev.sidecar.engine.SyncEngine
-import dev.sidecar.settings.Settings
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.engine.SyncEngine
+import ch.steigis.dinghy.settings.Settings
 
 /**
  * Quick-settings toggle for syncing. Worth having because the most common

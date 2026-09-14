@@ -1,4 +1,4 @@
-package dev.sidecar.ui
+package ch.steigis.dinghy.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,9 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.sidecar.R
-import dev.sidecar.binding.sushitrain.Sushitrain
-import dev.sidecar.engine.SyncEngine
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.binding.sushitrain.Sushitrain
+import ch.steigis.dinghy.engine.SyncEngine
 import kotlinx.coroutines.launch
 
 /**

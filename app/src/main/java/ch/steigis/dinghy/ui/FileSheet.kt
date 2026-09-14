@@ -1,4 +1,4 @@
-package dev.sidecar.ui
+package ch.steigis.dinghy.ui
 
 import android.content.Intent
 import android.util.Log
@@ -26,8 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import dev.sidecar.engine.EntryInfo
-import dev.sidecar.engine.SyncEngine
+import ch.steigis.dinghy.engine.EntryInfo
+import ch.steigis.dinghy.engine.SyncEngine
 import java.io.File
 import kotlinx.coroutines.launch
 

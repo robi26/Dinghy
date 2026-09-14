@@ -1,4 +1,4 @@
-package dev.sidecar.ui
+package ch.steigis.dinghy.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,8 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.sidecar.engine.FolderInfo
-import dev.sidecar.engine.SyncEngine
+import ch.steigis.dinghy.engine.FolderInfo
+import ch.steigis.dinghy.engine.SyncEngine
 import kotlinx.coroutines.launch
 
 internal fun formatBytes(bytes: Long): String {

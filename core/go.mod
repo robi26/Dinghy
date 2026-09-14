@@ -1,4 +1,4 @@
-module dev.sidecar/core
+module steigis.ch/dinghy/core
 
 go 1.27.0
 

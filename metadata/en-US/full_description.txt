@@ -1,4 +1,4 @@
-Sidecar is a Syncthing client with a browsable index and on-demand downloads.
+Dinghy is a Syncthing client with a browsable index and on-demand downloads.
 
 Your phone receives the complete file list from your other devices without
 receiving the files themselves. Browse the whole tree, then tap a file to pull
@@ -19,5 +19,5 @@ Features:
 * Sync only on unmetered Wi-Fi, or only while charging
 * No accounts, no servers, no telemetry
 
-Sidecar uses SushitrainCore, the sync engine from Synctrain for iOS, and is not
-affiliated with Syncthing or Synctrain.
+Dinghy uses SushitrainCore, an open-source Syncthing engine, and is not affiliated
+with the Syncthing project.

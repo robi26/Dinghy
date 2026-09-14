@@ -1,4 +1,4 @@
-package dev.sidecar.provider
+package ch.steigis.dinghy.provider
 
 import android.os.ProxyFileDescriptorCallback
 import android.system.ErrnoException

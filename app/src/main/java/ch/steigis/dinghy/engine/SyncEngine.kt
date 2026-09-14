@@ -1,15 +1,15 @@
-package dev.sidecar.engine
+package ch.steigis.dinghy.engine
 
 import android.content.Context
 import android.util.Log
-import dev.sidecar.binding.sushitrain.Change
-import dev.sidecar.binding.sushitrain.Client
-import dev.sidecar.binding.sushitrain.ClientDelegate
-import dev.sidecar.binding.sushitrain.DownloadDelegate
-import dev.sidecar.binding.sushitrain.Entry
-import dev.sidecar.binding.sushitrain.SearchResultDelegate
-import dev.sidecar.binding.sushitrain.ListOfStrings
-import dev.sidecar.binding.sushitrain.Sushitrain
+import ch.steigis.dinghy.binding.sushitrain.Change
+import ch.steigis.dinghy.binding.sushitrain.Client
+import ch.steigis.dinghy.binding.sushitrain.ClientDelegate
+import ch.steigis.dinghy.binding.sushitrain.DownloadDelegate
+import ch.steigis.dinghy.binding.sushitrain.Entry
+import ch.steigis.dinghy.binding.sushitrain.SearchResultDelegate
+import ch.steigis.dinghy.binding.sushitrain.ListOfStrings
+import ch.steigis.dinghy.binding.sushitrain.Sushitrain
 import java.io.File
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CompletableDeferred
@@ -47,7 +47,7 @@ object SyncEngine {
 
     /** Single thread so calls into Go are serialized and ordered. */
     private val engineDispatcher =
-        Executors.newSingleThreadExecutor { r -> Thread(r, "sidecar-engine") }
+        Executors.newSingleThreadExecutor { r -> Thread(r, "dinghy-engine") }
             .asCoroutineDispatcher()
 
     private val scope = CoroutineScope(SupervisorJob() + engineDispatcher)
@@ -230,7 +230,7 @@ object SyncEngine {
         }
 
     private fun entryInfo(
-        folder: dev.sidecar.binding.sushitrain.Folder,
+        folder: ch.steigis.dinghy.binding.sushitrain.Folder,
         path: String,
         name: String,
     ): EntryInfo? = try {

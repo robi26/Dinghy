@@ -1,4 +1,4 @@
-package dev.sidecar.provider
+package ch.steigis.dinghy.provider
 
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -13,9 +13,9 @@ import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
-import dev.sidecar.R
-import dev.sidecar.engine.EntryInfo
-import dev.sidecar.engine.SyncEngine
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.engine.EntryInfo
+import ch.steigis.dinghy.engine.SyncEngine
 import java.io.File
 import java.io.FileNotFoundException
 import kotlinx.coroutines.runBlocking
@@ -29,9 +29,10 @@ import kotlinx.coroutines.runBlocking
  * streaming server. Files that are on disk are handed over as ordinary
  * descriptors.
  *
- * This is the Android counterpart of Synctrain's iOS File Provider extension.
+ * This is the Android counterpart of the upstream project's iOS File Provider
+ * extension.
  */
-class SidecarDocumentsProvider : DocumentsProvider() {
+class DinghyDocumentsProvider : DocumentsProvider() {
 
     private lateinit var proxyThread: HandlerThread
     private lateinit var proxyHandler: Handler
@@ -39,7 +40,7 @@ class SidecarDocumentsProvider : DocumentsProvider() {
     override fun onCreate(): Boolean {
         // Proxy descriptor callbacks must not run on a binder thread: their
         // reads go out over the network.
-        proxyThread = HandlerThread("sidecar-proxy-fd").apply { start() }
+        proxyThread = HandlerThread("dinghy-proxy-fd").apply { start() }
         proxyHandler = Handler(proxyThread.looper)
         return true
     }

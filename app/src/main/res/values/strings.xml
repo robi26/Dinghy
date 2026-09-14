@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sidecar</string>
+    <string name="app_name">Dinghy</string>
 
     <string name="channel_sync">Sync status</string>
     <string name="status_stopped">Stopped</string>
@@ -40,11 +40,11 @@
     <string name="added_device">Added %1$s</string>
 
     <string name="warn_battery_title">Battery optimization is on</string>
-    <string name="warn_battery_body">Android will stop syncing in the background. Allow Sidecar to run unrestricted.</string>
+    <string name="warn_battery_body">Android will stop syncing in the background. Allow Dinghy to run unrestricted.</string>
     <string name="warn_battery_action">Allow</string>
 
     <string name="warn_network_title">No network permission</string>
-    <string name="warn_network_body">Sidecar cannot reach your other devices. Grant the Network permission in Android settings.</string>
+    <string name="warn_network_body">Dinghy cannot reach your other devices. Grant the Network permission in Android settings.</string>
     <string name="warn_network_action">Open settings</string>
 
     <string name="warn_notifications_title">Notifications are off</string>

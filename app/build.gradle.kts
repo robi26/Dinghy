@@ -133,7 +133,7 @@ val gomobileTools = tasks.register("gomobileTools") {
     }
 }
 
-val gomobileAar = layout.buildDirectory.file("gomobile/sidecar-core.aar")
+val gomobileAar = layout.buildDirectory.file("gomobile/dinghy-core.aar")
 
 val gomobileBind = tasks.register("gomobileBind") {
     description = "Binds SushitrainCore to an Android AAR via gomobile"
@@ -156,7 +156,7 @@ val gomobileBind = tasks.register("gomobileBind") {
                 "bind",
                 "-target=${selectedAbis.joinToString(",") { "android/${goArchFor(it)}" }}",
                 "-androidapi=$minSdkVersion",
-                "-javapkg=dev.sidecar.binding",
+                "-javapkg=ch.steigis.dinghy.binding",
                 // Excludes Syncthing's embedded web UI assets; we ship our own UI.
                 "-tags=noassets",
                 // Syncthing reaches Android's network interfaces through
@@ -169,7 +169,7 @@ val gomobileBind = tasks.register("gomobileBind") {
                     "-X github.com/syncthing/syncthing/lib/build.Version=$engineVersion",
                 "-o=${out.absolutePath}",
                 "t-shaped.nl/sushitrain/v2/src",
-                "dev.sidecar/core",
+                "steigis.ch/dinghy/core",
             )
             applyGoEnvironment()
             workingDir(coreSrcDir.asFile)
@@ -190,16 +190,16 @@ val keystoreProperties = Properties().apply {
 fun signingValue(property: String, environment: String): String? =
     keystoreProperties.getProperty(property) ?: System.getenv(environment)
 
-val keystorePath = signingValue("storeFile", "SIDECAR_KEYSTORE_FILE")
+val keystorePath = signingValue("storeFile", "DINGHY_KEYSTORE_FILE")
 val hasSigningConfig = keystorePath != null && File(keystorePath).exists()
 
 android {
-    namespace = "dev.sidecar"
+    namespace = "ch.steigis.dinghy"
     compileSdk = 36
     ndkVersion = ndkVersionUsed
 
     defaultConfig {
-        applicationId = "dev.sidecar"
+        applicationId = "ch.steigis.dinghy"
         // 26 is the floor for StorageManager.openProxyFileDescriptor, which the
         // DocumentsProvider needs to serve files that are not downloaded yet.
         minSdk = minSdkVersion
@@ -224,9 +224,9 @@ android {
         if (hasSigningConfig) {
             create("release") {
                 storeFile = File(keystorePath!!)
-                storePassword = signingValue("storePassword", "SIDECAR_KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "SIDECAR_KEY_ALIAS")
-                keyPassword = signingValue("keyPassword", "SIDECAR_KEY_PASSWORD")
+                storePassword = signingValue("storePassword", "DINGHY_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "DINGHY_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "DINGHY_KEY_PASSWORD")
                 // v1 is pointless at minSdk 26 and slows installs; v3 carries
                 // the rotation proof that lets the signing key be changed later
                 // without orphaning existing installs.
@@ -287,7 +287,7 @@ val dist = tasks.register<Copy>("dist") {
     val abi = selectedAbis.singleOrNull() ?: "universal"
     from(layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
-        rename { "sidecar-$versionNameValue-$abi.apk" }
+        rename { "dinghy-$versionNameValue-$abi.apk" }
     }
     into(rootProject.layout.projectDirectory.dir("dist"))
 }

@@ -40,20 +40,20 @@ jobs:
 
       - name: Decode keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.SIDECAR_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.DINGHY_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::SIDECAR_KEYSTORE_BASE64 is not set; a release must be signed"
+            echo "::error::DINGHY_KEYSTORE_BASE64 is not set; a release must be signed"
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
 
       - name: Build
         env:
-          SIDECAR_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
-          SIDECAR_KEYSTORE_PASSWORD: ${{ secrets.SIDECAR_KEYSTORE_PASSWORD }}
-          SIDECAR_KEY_ALIAS: ${{ secrets.SIDECAR_KEY_ALIAS }}
-          SIDECAR_KEY_PASSWORD: ${{ secrets.SIDECAR_KEY_PASSWORD }}
+          DINGHY_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          DINGHY_KEYSTORE_PASSWORD: ${{ secrets.DINGHY_KEYSTORE_PASSWORD }}
+          DINGHY_KEY_ALIAS: ${{ secrets.DINGHY_KEY_ALIAS }}
+          DINGHY_KEY_PASSWORD: ${{ secrets.DINGHY_KEY_PASSWORD }}
         run: ./gradlew :app:dist -Pabi=${{ matrix.abi }}
 
       - name: Verify it is actually signed
@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sidecar-${{ matrix.abi }}
+          name: dinghy-${{ matrix.abi }}
           path: dist/*.apk
 
   publish:
@@ -92,7 +92,7 @@ jobs:
               name=$(basename "$f")
               # Strip the known prefix rather than pattern-match the tail:
               # ABI names contain dashes, so a greedy match yields "v8a".
-              abi="${name#sidecar-${VERSION}-}"
+              abi="${name#dinghy-${VERSION}-}"
               abi="${abi%.apk}"
               [ $first -eq 0 ] && echo ','
               first=0

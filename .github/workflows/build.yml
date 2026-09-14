@@ -56,5 +56,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sidecar-debug-${{ matrix.abi }}
+          name: dinghy-debug-${{ matrix.abi }}
           path: app/build/outputs/apk/debug/*.apk

@@ -1,4 +1,4 @@
-package dev.sidecar.service
+package ch.steigis.dinghy.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -14,10 +14,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import dev.sidecar.R
-import dev.sidecar.engine.EngineState
-import dev.sidecar.engine.SyncEngine
-import dev.sidecar.ui.MainActivity
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.engine.EngineState
+import ch.steigis.dinghy.engine.SyncEngine
+import ch.steigis.dinghy.ui.MainActivity
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -197,7 +197,7 @@ class SyncService : LifecycleService() {
         private const val TAG = "SyncService"
         private const val CHANNEL_ID = "sync"
         private const val NOTIFICATION_ID = 1
-        const val ACTION_STOP = "dev.sidecar.STOP"
+        const val ACTION_STOP = "ch.steigis.dinghy.STOP"
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, SyncService::class.java))

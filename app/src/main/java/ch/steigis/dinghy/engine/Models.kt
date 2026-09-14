@@ -1,4 +1,4 @@
-package dev.sidecar.engine
+package ch.steigis.dinghy.engine
 
 /** A configured folder, as shown in the folder list. */
 data class FolderInfo(

@@ -1,4 +1,4 @@
-package dev.sidecar.settings
+package ch.steigis.dinghy.settings
 
 import android.content.Context
 
@@ -40,7 +40,7 @@ class Settings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
 
     companion object {
-        const val PREFS_NAME = "sidecar"
+        const val PREFS_NAME = "dinghy"
 
         const val KEY_AUTO_START = "auto_start"
         const val KEY_SYNC_ENABLED = "sync_enabled"

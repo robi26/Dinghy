@@ -1,4 +1,4 @@
-// Package core is the Android-facing surface of the Sidecar sync engine.
+// Package core is the Android-facing surface of the Dinghy sync engine.
 //
 // The synchronization engine itself is SushitrainCore (MPL-2.0), which is
 // platform-neutral Go and is bound directly by gomobile alongside this
