@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -191,6 +192,8 @@ fun FolderSettingsScreen(
     var devices by remember(folderId) { mutableStateOf<List<DeviceInfo>>(emptyList()) }
     var shares by remember(folderId) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var reload by remember(folderId) { mutableStateOf(0) }
+    var folder by remember(folderId) { mutableStateOf<FolderInfo?>(null) }
+    var confirmFullSync by remember(folderId) { mutableStateOf(false) }
     var confirmRemove by remember(folderId) { mutableStateOf(false) }
     var deleteFiles by remember(folderId) { mutableStateOf(false) }
     var error by remember(folderId) { mutableStateOf<String?>(null) }
@@ -200,11 +203,53 @@ fun FolderSettingsScreen(
         while (true) {
             devices = SyncEngine.devices()
             shares = SyncEngine.folderShares(folderId).toMap()
+            folder = SyncEngine.folders().firstOrNull { it.id == folderId }
             delay(PEER_REFRESH_MILLIS)
         }
     }
 
     TabColumn(contentPadding) {
+        SectionLabel(stringResource(R.string.label_folder_sync))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.folder_on_demand_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        stringResource(R.string.folder_on_demand_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = folder?.isSelective == true,
+                    enabled = folder != null,
+                    onCheckedChange = { wantSelective ->
+                        if (wantSelective) {
+                            // Turning it on only stops fetching more; what is
+                            // already here is ignored, not deleted.
+                            scope.launch {
+                                runCatching { SyncEngine.setFolderSelective(folderId, true) }
+                                    .onFailure { error = it.message ?: it.javaClass.simpleName }
+                                reload++
+                            }
+                        } else {
+                            // Turning it off starts downloading the whole
+                            // folder, so it gets asked about first.
+                            confirmFullSync = true
+                        }
+                    },
+                )
+            }
+        }
+
         SectionLabel(stringResource(R.string.label_shared_with))
         Card(modifier = Modifier.fillMaxWidth()) {
             if (devices.isEmpty()) {
@@ -262,6 +307,36 @@ fun FolderSettingsScreen(
         OutlinedButton(onClick = { deleteFiles = false; confirmRemove = true }) {
             Text(stringResource(R.string.action_remove_folder))
         }
+    }
+
+    if (confirmFullSync) {
+        AlertDialog(
+            onDismissRequest = { confirmFullSync = false },
+            title = { Text(stringResource(R.string.full_sync_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.full_sync_body,
+                        formatBytes(folder?.globalBytes ?: 0L),
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmFullSync = false
+                    scope.launch {
+                        runCatching { SyncEngine.setFolderSelective(folderId, false) }
+                            .onFailure { error = it.message ?: it.javaClass.simpleName }
+                        reload++
+                    }
+                }) { Text(stringResource(R.string.action_download_everything)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmFullSync = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 
     if (confirmRemove) {

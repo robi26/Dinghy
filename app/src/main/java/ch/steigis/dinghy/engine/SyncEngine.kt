@@ -252,6 +252,22 @@ object SyncEngine {
         }
 
     /**
+     * Turns on-demand syncing on or off for a folder.
+     *
+     * The two directions are not symmetrical. Turning it on appends "*" to the
+     * folder's ignores, so nothing new is fetched; files already downloaded are
+     * ignored rather than deleted, and stay put. Turning it off removes that
+     * pattern, which means the folder will proceed to download all of it.
+     */
+    suspend fun setFolderSelective(folderId: String, selective: Boolean) =
+        withContext(engineDispatcher) {
+            val running = client ?: error("engine is not running")
+            val folder = running.folderWithID(folderId) ?: error("no folder $folderId")
+            folder.setSelective(selective)
+            refreshState()
+        }
+
+    /**
      * Stops syncing a folder.
      *
      * [deleteLocalFiles] is the whole decision. Unlink drops the folder from the

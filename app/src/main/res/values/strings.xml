@@ -78,6 +78,11 @@
     <string name="action_add_folder">Add folder\u2026</string>
     <string name="action_add_folder_button">Add folder</string>
     <string name="label_folder_settings">Folder settings</string>
+    <string name="label_folder_sync">Syncing</string>
+    <string name="folder_on_demand_summary">Keep the file list, download only what you ask for</string>
+    <string name="full_sync_title">Download everything?</string>
+    <string name="full_sync_body">Turning off on-demand downloads the whole folder to this device, now and as it changes. That is %1$s.</string>
+    <string name="action_download_everything">Download everything</string>
     <string name="action_remove_folder">Remove folder</string>
     <string name="remove_folder_title">Remove this folder?</string>
     <string name="remove_folder_body">Dinghy will stop syncing it. The folder stays on your other devices.</string>
