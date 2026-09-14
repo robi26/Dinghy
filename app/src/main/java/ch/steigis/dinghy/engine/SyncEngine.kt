@@ -240,6 +240,15 @@ object SyncEngine {
         refreshState()
     }
 
+    /**
+     * The entry's modification time, or null when there is not one.
+     *
+     * An entry the index has no date for comes back as a zero Date, which would
+     * otherwise read as 1970 rather than being omitted.
+     */
+    private fun Entry.modifiedMillis(): Long? =
+        runCatching { modifiedAt()?.unixMilliseconds() }.getOrNull()?.takeIf { it > 0 }
+
     /** Peers, paired with whether this folder is shared with each. */
     suspend fun folderShares(folderId: String): List<Pair<String, Boolean>> =
         withContext(engineDispatcher) {
@@ -342,6 +351,8 @@ object SyncEngine {
                 isExplicitlySelected = e.isExplicitlySelected,
                 isSelected = e.isSelected,
                 isConflictCopy = e.isConflictCopy,
+                modifiedAt = e.modifiedMillis(),
+                modifiedBy = runCatching { e.modifiedByShortDeviceID() }.getOrNull().orEmpty(),
             )
         }
     } catch (t: Throwable) {
@@ -404,6 +415,9 @@ object SyncEngine {
                                 isExplicitlySelected = e.isExplicitlySelected,
                                 isSelected = e.isSelected,
                                 isConflictCopy = e.isConflictCopy,
+                                modifiedAt = e.modifiedMillis(),
+                                modifiedBy = runCatching { e.modifiedByShortDeviceID() }
+                                    .getOrNull().orEmpty(),
                                 folderId = folder?.folderID.orEmpty(),
                                 folderLabel = folder?.let {
                                     runCatching { it.label() }.getOrNull()?.ifEmpty { null }

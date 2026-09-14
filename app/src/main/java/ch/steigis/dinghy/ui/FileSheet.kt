@@ -26,11 +26,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import ch.steigis.dinghy.R
 import ch.steigis.dinghy.engine.EntryInfo
 import ch.steigis.dinghy.engine.SyncEngine
 import java.io.File
+import java.text.DateFormat
+import java.util.Date
 import kotlinx.coroutines.launch
 
 /**
@@ -67,6 +71,25 @@ fun FileSheet(folderId: String, entry: EntryInfo, onDismiss: () -> Unit) {
             Text(
                 if (entry.isLocallyPresent) "On this device" else "Streams from your other devices",
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Directly under the presence line: that says whether you have the
+            // file, this says how current it is, and the two together are what
+            // you came to the sheet to find out. Below the preview they would
+            // be separated by the whole thing being previewed.
+            Text(
+                entry.modifiedAt?.let { millis ->
+                    val moment = DateFormat
+                        .getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                        .format(Date(millis))
+                    if (entry.modifiedBy.isNotBlank()) {
+                        stringResource(R.string.file_modified_by, moment, entry.modifiedBy)
+                    } else {
+                        stringResource(R.string.file_modified, moment)
+                    }
+                } ?: stringResource(R.string.file_modified_unknown),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 

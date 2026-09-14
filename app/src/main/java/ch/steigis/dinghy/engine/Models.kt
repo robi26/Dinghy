@@ -67,6 +67,19 @@ data class EntryInfo(
     /** A Syncthing conflict copy, e.g. "notes.sync-conflict-20260101-120000-ABCDEFG.md". */
     val isConflictCopy: Boolean = false,
     /**
+     * When the file was last changed, by whoever changed it, in epoch millis.
+     * Null when the index has no timestamp -- directories, and entries the
+     * engine could not read a date from.
+     *
+     * This is the file's own modification time as it travelled through the
+     * index, not when this device fetched it. On a phone holding a file list
+     * rather than the files, that is the more useful of the two: it says how
+     * current the thing you are looking at is, whether or not you have it.
+     */
+    val modifiedAt: Long? = null,
+    /** Short id of the device that last changed it; empty when unknown. */
+    val modifiedBy: String = "",
+    /**
      * Folder this entry belongs to. Only filled in by search, and only there
      * because a search across every folder returns paths that are relative to
      * their own folder root -- without this, two files called notes.md in

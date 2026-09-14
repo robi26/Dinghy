@@ -78,6 +78,9 @@
     <string name="action_add_folder">Add folder\u2026</string>
     <string name="action_add_folder_button">Add folder</string>
     <string name="label_folder_settings">Folder settings</string>
+    <string name="file_modified">Modified %1$s</string>
+    <string name="file_modified_by">Modified %1$s by %2$s</string>
+    <string name="file_modified_unknown">No modification date in the index</string>
     <string name="label_folder_sync">Syncing</string>
     <string name="folder_on_demand_summary">Keep the file list, download only what you ask for</string>
     <string name="full_sync_title">Download everything?</string>
