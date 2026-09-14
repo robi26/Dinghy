@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -90,26 +93,35 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Where the user is. Small enough that a navigation library would be overhead. */
-private sealed interface Screen {
-    data object Status : Screen
-    data class Browse(val folderId: String, val label: String, val prefix: String) : Screen
-    data class Search(val folderId: String, val label: String) : Screen
+/**
+ * The three top-level destinations. Splitting them up is what the bottom bar is
+ * for: everything used to be one scroll, so the device ID, the folder list, the
+ * add-folder form, the add-device form and the sync settings all competed for
+ * the same column.
+ */
+private enum class Tab(val labelRes: Int, val iconRes: Int) {
+    Devices(R.string.tab_devices, R.drawable.ic_devices),
+    Folders(R.string.tab_folders, R.drawable.ic_folder),
+    Settings(R.string.tab_settings, R.drawable.ic_settings),
 }
 
 /**
- * One app bar for every screen, which is what makes browsing legible: the title
- * says which folder you are in, the line under it says where inside that folder,
- * and the arrow goes back up a level. Before this the only way back was the
- * system gesture and nothing on screen said how deep you were.
+ * Screens pushed on top of a tab rather than reached from the bar. Small enough
+ * that a navigation library would be overhead.
  */
+private sealed interface Detail {
+    data class Browse(val folderId: String, val label: String, val prefix: String) : Detail
+    data class Search(val folderId: String, val label: String) : Detail
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DinghyApp() {
-    var stack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Status)) }
-    val current = stack.last()
+    var tab by remember { mutableStateOf(Tab.Devices) }
+    var stack by remember { mutableStateOf<List<Detail>>(emptyList()) }
+    val detail = stack.lastOrNull()
 
-    BackHandler(enabled = stack.size > 1) { stack = stack.dropLast(1) }
+    BackHandler(enabled = stack.isNotEmpty()) { stack = stack.dropLast(1) }
 
     Scaffold(
         topBar = {
@@ -117,18 +129,18 @@ private fun DinghyApp() {
                 title = {
                     Column {
                         Text(
-                            when (current) {
-                                is Screen.Status -> stringResource(R.string.app_name)
-                                is Screen.Browse -> current.label
-                                is Screen.Search -> current.label
+                            when (detail) {
+                                is Detail.Browse -> detail.label
+                                is Detail.Search -> detail.label
+                                null -> stringResource(tab.labelRes)
                             },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        val crumb = when (current) {
-                            is Screen.Browse -> "/" + current.prefix.trimEnd('/')
-                            is Screen.Search -> stringResource(R.string.action_search)
-                            is Screen.Status -> null
+                        val crumb = when (detail) {
+                            is Detail.Browse -> "/" + detail.prefix.trimEnd('/')
+                            is Detail.Search -> stringResource(R.string.action_search)
+                            null -> null
                         }
                         if (crumb != null) {
                             Text(
@@ -142,7 +154,7 @@ private fun DinghyApp() {
                     }
                 },
                 navigationIcon = {
-                    if (stack.size > 1) {
+                    if (detail != null) {
                         IconButton(onClick = { stack = stack.dropLast(1) }) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_arrow_back),
@@ -152,9 +164,9 @@ private fun DinghyApp() {
                     }
                 },
                 actions = {
-                    if (current is Screen.Browse) {
+                    if (detail is Detail.Browse) {
                         TextButton(onClick = {
-                            stack = stack + Screen.Search(current.folderId, current.label)
+                            stack = stack + Detail.Search(detail.folderId, detail.label)
                         }) { Text(stringResource(R.string.action_search)) }
                     }
                 },
@@ -163,51 +175,84 @@ private fun DinghyApp() {
                 ),
             )
         },
+        bottomBar = {
+            NavigationBar {
+                Tab.entries.forEach { entry ->
+                    NavigationBarItem(
+                        // A tab stays selected while you are inside one of its
+                        // detail screens, so browsing a folder does not leave
+                        // the bar looking as though nothing is open.
+                        selected = tab == entry,
+                        onClick = {
+                            // Re-selecting the current tab pops back to its root,
+                            // which is the usual way out of a deep folder.
+                            stack = emptyList()
+                            tab = entry
+                        },
+                        icon = {
+                            Icon(
+                                painter = painterResource(entry.iconRes),
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(entry.labelRes)) },
+                    )
+                }
+            }
+        },
     ) { innerPadding ->
-        when (current) {
-            is Screen.Status -> StatusScreen(
-                contentPadding = innerPadding,
-                onOpenFolder = { folder ->
-                    stack = stack + Screen.Browse(folder.id, folder.label, "")
-                },
-            )
-
-            is Screen.Search -> Box(modifier = Modifier.padding(innerPadding)) {
-                SearchScreen(folderId = current.folderId)
+        val openFolder: (ch.steigis.dinghy.engine.FolderInfo) -> Unit = { folder ->
+            stack = stack + Detail.Browse(folder.id, folder.label, "")
+        }
+        when (detail) {
+            is Detail.Search -> Box(modifier = Modifier.padding(innerPadding)) {
+                SearchScreen(folderId = detail.folderId)
             }
 
-            is Screen.Browse -> Box(modifier = Modifier.padding(innerPadding)) {
+            is Detail.Browse -> Box(modifier = Modifier.padding(innerPadding)) {
                 BrowserScreen(
-                    folderId = current.folderId,
-                    prefix = current.prefix,
+                    folderId = detail.folderId,
+                    prefix = detail.prefix,
                     onOpenDirectory = { childPrefix ->
-                        stack = stack + Screen.Browse(current.folderId, current.label, childPrefix)
+                        stack = stack + Detail.Browse(detail.folderId, detail.label, childPrefix)
                     },
                 )
+            }
+
+            null -> when (tab) {
+                Tab.Devices -> DevicesScreen(innerPadding)
+                Tab.Folders -> FoldersTab(innerPadding, openFolder)
+                Tab.Settings -> SettingsScreen(innerPadding)
             }
         }
     }
 }
 
+/** Shared column treatment for a tab: insets first, then scroll, then padding. */
 @Composable
-private fun StatusScreen(
+private fun TabColumn(
     contentPadding: PaddingValues,
-    onOpenFolder: (ch.steigis.dinghy.engine.FolderInfo) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    val context = LocalContext.current
-    val state by SyncEngine.state.collectAsStateWithLifecycle()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            // Inset first, scroll second: the content keeps clear of the status
-            // and gesture bars instead of sliding underneath them. The title
-            // that used to be here now lives in the app bar.
             .padding(contentPadding)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+        content = content,
+    )
+}
+
+@Composable
+private fun DevicesScreen(contentPadding: PaddingValues) {
+    val context = LocalContext.current
+    val state by SyncEngine.state.collectAsStateWithLifecycle()
+
+    TabColumn(contentPadding) {
+        // The warnings live here rather than on every tab: this is the landing
+        // tab, and all three of them are reasons the node is not running.
         SetupWarnings()
 
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -240,10 +285,6 @@ private fun StatusScreen(
                     ) {
                         Text(stringResource(R.string.action_copy))
                     }
-                    Text(
-                        "${stringResource(R.string.label_folders)}: ${running.folders}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                     if (running.listenAddresses.isNotEmpty()) {
                         Text(
                             running.listenAddresses.joinToString(", "),
@@ -253,15 +294,6 @@ private fun StatusScreen(
                 }
             }
         }
-
-        FoldersSection(
-            enabled = state is EngineState.Running,
-            onOpenFolder = onOpenFolder,
-        )
-
-        AddDeviceCard(enabled = state is EngineState.Running)
-
-        ConditionsCard()
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -284,9 +316,32 @@ private fun StatusScreen(
             }
         }
 
+        AddDeviceCard(enabled = state is EngineState.Running)
+    }
+}
+
+@Composable
+private fun FoldersTab(
+    contentPadding: PaddingValues,
+    onOpenFolder: (ch.steigis.dinghy.engine.FolderInfo) -> Unit,
+) {
+    val state by SyncEngine.state.collectAsStateWithLifecycle()
+    TabColumn(contentPadding) {
+        FoldersSection(
+            enabled = state is EngineState.Running,
+            onOpenFolder = onOpenFolder,
+        )
+    }
+}
+
+@Composable
+private fun SettingsScreen(contentPadding: PaddingValues) {
+    TabColumn(contentPadding) {
+        ConditionsCard()
         Text(
             "${stringResource(R.string.label_engine)}: ${Core.coreVersion()}",
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

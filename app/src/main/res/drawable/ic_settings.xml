@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      Sliders rather than a gear. The settings here are two toggles for sync
+      conditions, and a gear's teeth turn to mush at 24dp in a stroked style.
+    -->
+    <path
+        android:pathData="M3,8 H12.5 M17.5,8 H21 M3,16 H7.5 M12.5,16 H21"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M12.5,8 a2.5,2.5 0 1 1 5,0 a2.5,2.5 0 1 1 -5,0 z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7" />
+    <path
+        android:pathData="M7.5,16 a2.5,2.5 0 1 1 5,0 a2.5,2.5 0 1 1 -5,0 z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7" />
+</vector>
