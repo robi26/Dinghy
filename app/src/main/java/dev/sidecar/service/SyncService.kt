@@ -19,6 +19,10 @@ import dev.sidecar.engine.EngineState
 import dev.sidecar.engine.SyncEngine
 import dev.sidecar.ui.MainActivity
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -43,6 +47,34 @@ class SyncService : LifecycleService() {
                     notificationManager.notify(NOTIFICATION_ID, buildNotification(state))
                 }
             }
+        }
+
+        // Hold syncing off when the user's conditions are not met. Peers are
+        // paused rather than the engine stopped, so browsing keeps working.
+        //
+        // Combined with the engine state on purpose: the conditions flow emits
+        // as soon as the service is created, which is before the engine has
+        // loaded. Applying the result then is a no-op, and since the flow only
+        // re-emits on change, peers would stay however they were left -- paused
+        // across a restart, in the worst case, with nothing to un-pause them.
+        lifecycleScope.launch {
+            combine(
+                applicationContext.runConditions(),
+                SyncEngine.state,
+            ) { allowed, state -> allowed to state }
+                .filter { (_, state) -> state is EngineState.Running }
+                .map { (allowed, _) -> allowed }
+                .distinctUntilChanged()
+                .collectLatest { allowed ->
+                    blockedBy = allowed
+                    SyncEngine.setPeersPaused(allowed != SyncAllowed.Yes)
+                    if (isForegroundStarted) {
+                        notificationManager.notify(
+                            NOTIFICATION_ID,
+                            buildNotification(SyncEngine.state.value),
+                        )
+                    }
+                }
         }
     }
 
@@ -80,6 +112,7 @@ class SyncService : LifecycleService() {
     }
 
     private var isForegroundStarted = false
+    private var blockedBy: SyncAllowed = SyncAllowed.Yes
 
     private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
 
@@ -107,7 +140,15 @@ class SyncService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val text = when (state) {
+        val blocked = blockedBy
+        val text = if (blocked != SyncAllowed.Yes) {
+            when (blocked) {
+                SyncAllowed.MeteredNetwork -> getString(R.string.status_paused_metered)
+                SyncAllowed.NotCharging -> getString(R.string.status_paused_charging)
+                SyncAllowed.NoNetwork -> getString(R.string.status_no_network)
+                SyncAllowed.Yes -> ""
+            }
+        } else when (state) {
             is EngineState.Stopped -> getString(R.string.status_stopped)
             is EngineState.Loading -> getString(R.string.status_loading)
             is EngineState.Starting -> getString(R.string.status_starting)

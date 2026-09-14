@@ -2,11 +2,13 @@ package dev.sidecar.provider
 
 import android.database.Cursor
 import android.database.MatrixCursor
+import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
+import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
@@ -59,7 +61,7 @@ class SidecarDocumentsProvider : DocumentsProvider() {
                 add(Root.COLUMN_TITLE, context.getString(R.string.app_name))
                 add(Root.COLUMN_SUMMARY, folder.label)
                 add(Root.COLUMN_ICON, android.R.drawable.ic_menu_save)
-                add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_IS_CHILD)
+                add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_IS_CHILD or Root.FLAG_SUPPORTS_SEARCH)
             }
         }
         return cursor
@@ -111,6 +113,41 @@ class SidecarDocumentsProvider : DocumentsProvider() {
         if (parentFolder != childFolder) return false
         if (parentPath.isEmpty()) return childPath.isNotEmpty()
         return childPath.startsWith(parentPath.trimEnd('/') + "/")
+    }
+
+    /**
+     * Modern pickers search through the Bundle overload; the framework's
+     * default implementation of it rejects a null Bundle rather than falling
+     * back, so this is the one that has to be implemented.
+     */
+    override fun querySearchDocuments(
+        rootId: String,
+        projection: Array<out String>?,
+        queryArgs: Bundle,
+    ): Cursor {
+        val query = queryArgs.getString(DocumentsContract.QUERY_ARG_DISPLAY_NAME).orEmpty()
+        return searchCursor(rootId, query, projection)
+    }
+
+    /** Retained for pickers that still use the pre-Bundle search path. */
+    override fun querySearchDocuments(
+        rootId: String,
+        query: String,
+        projection: Array<out String>?,
+    ): Cursor = searchCursor(rootId, query, projection)
+
+    private fun searchCursor(
+        rootId: String,
+        query: String,
+        projection: Array<out String>?,
+    ): Cursor {
+        val cursor = MatrixCursor(projection ?: DEFAULT_DOCUMENT_PROJECTION)
+        if (query.isBlank()) return cursor
+        // Searches the global index, so results include files that are not on
+        // this device -- the same set the in-app browser shows.
+        runBlocking { SyncEngine.search(query, rootId, SEARCH_LIMIT) }
+            .forEach { cursor.addEntry(rootId, it) }
+        return cursor
     }
 
     // ---- opening -----------------------------------------------------------
@@ -270,6 +307,8 @@ class SidecarDocumentsProvider : DocumentsProvider() {
     }
 
     private companion object {
+        const val SEARCH_LIMIT = 200L
+
         val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,
             Root.COLUMN_DOCUMENT_ID,

@@ -6,6 +6,8 @@ import dev.sidecar.binding.sushitrain.Change
 import dev.sidecar.binding.sushitrain.Client
 import dev.sidecar.binding.sushitrain.ClientDelegate
 import dev.sidecar.binding.sushitrain.DownloadDelegate
+import dev.sidecar.binding.sushitrain.Entry
+import dev.sidecar.binding.sushitrain.SearchResultDelegate
 import dev.sidecar.binding.sushitrain.ListOfStrings
 import dev.sidecar.binding.sushitrain.Sushitrain
 import java.io.File
@@ -13,6 +15,7 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -147,6 +150,7 @@ object SyncEngine {
         val running = client ?: return@withContext emptyList()
         running.folders().toList().mapNotNull { id ->
             val folder = running.folderWithID(id) ?: return@mapNotNull null
+            val stats = runCatching { folder.statistics() }.getOrNull()
             FolderInfo(
                 id = id,
                 label = folder.label().ifEmpty { id },
@@ -154,6 +158,9 @@ object SyncEngine {
                 isSelective = folder.isSelective,
                 isPaused = folder.isPaused,
                 connectedPeers = folder.connectedPeerCount().toInt(),
+                globalFiles = stats?.global?.files ?: 0,
+                globalBytes = stats?.global?.bytes ?: 0,
+                localBytes = stats?.local?.bytes ?: 0,
             )
         }
     }
@@ -236,11 +243,78 @@ object SyncEngine {
                 isLocallyPresent = e.isLocallyPresent,
                 isExplicitlySelected = e.isExplicitlySelected,
                 isSelected = e.isSelected,
+                isConflictCopy = e.isConflictCopy,
             )
         }
     } catch (t: Throwable) {
         Log.w(TAG, "could not read entry $path", t)
         null
+    }
+
+    // ---- run conditions -------------------------------------------------
+
+    /**
+     * Pauses or resumes every peer.
+     *
+     * Deliberately pauses *peers* rather than stopping the engine: the index
+     * stays loaded, so folders remain browsable and already-downloaded files
+     * remain readable while syncing is held off. For an on-demand app that is
+     * the difference between "waiting" and "unusable".
+     */
+    suspend fun setPeersPaused(paused: Boolean) = withContext(engineDispatcher) {
+        val running = client ?: return@withContext
+        val ownId = running.deviceID()
+        running.peers().toList().filter { it != ownId }.forEach { id ->
+            runCatching { running.peerWithID(id)?.setPaused(paused) }
+                .onFailure { Log.w(TAG, "could not set paused=$paused on $id", it) }
+        }
+        refreshState()
+    }
+
+    // ---- search -----------------------------------------------------------
+
+    /**
+     * Searches file names in the global index, so it finds files that are not
+     * downloaded. Results arrive through a delegate; this collects them.
+     */
+    suspend fun search(
+        text: String,
+        folderId: String = "",
+        maxResults: Long = 200,
+    ): List<EntryInfo> = withContext(engineDispatcher) {
+        val running = client ?: return@withContext emptyList()
+        if (text.isBlank()) return@withContext emptyList()
+
+        val results = mutableListOf<EntryInfo>()
+        val job = coroutineContext[Job]
+        running.search(
+            text,
+            object : SearchResultDelegate {
+                override fun result(entry: Entry?) {
+                    val e = entry ?: return
+                    runCatching {
+                        results.add(
+                            EntryInfo(
+                                name = e.fileName(),
+                                path = e.path(),
+                                isDirectory = e.isDirectory,
+                                size = e.size(),
+                                isLocallyPresent = e.isLocallyPresent,
+                                isExplicitlySelected = e.isExplicitlySelected,
+                                isSelected = e.isSelected,
+                                isConflictCopy = e.isConflictCopy,
+                            ),
+                        )
+                    }
+                }
+
+                override fun isCancelled(): Boolean = job?.isActive == false
+            },
+            maxResults,
+            folderId,
+            "",
+        )
+        results
     }
 
     /**

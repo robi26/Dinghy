@@ -27,6 +27,18 @@ import dev.sidecar.engine.FolderInfo
 import dev.sidecar.engine.SyncEngine
 import kotlinx.coroutines.launch
 
+internal fun formatBytes(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    val units = listOf("KB", "MB", "GB", "TB")
+    var value = bytes.toDouble() / 1024
+    var unit = 0
+    while (value >= 1024 && unit < units.lastIndex) {
+        value /= 1024
+        unit++
+    }
+    return String.format("%.1f %s", value, units[unit])
+}
+
 /** Folder list plus the add-folder form. */
 @Composable
 fun FoldersSection(enabled: Boolean, onOpenFolder: (FolderInfo) -> Unit) {
@@ -66,7 +78,13 @@ fun FoldersSection(enabled: Boolean, onOpenFolder: (FolderInfo) -> Unit) {
                                 buildString {
                                     append(if (folder.isSelective) "on-demand" else "full sync")
                                     if (folder.isPaused) append(" · paused")
-                                    append(" · ${folder.connectedPeers} connected")
+                                    append(" · ${folder.globalFiles} files")
+                                    // The point of the app: stored is normally a
+                                    // small fraction of what is visible.
+                                    append(
+                                        " · ${formatBytes(folder.localBytes)} of " +
+                                            formatBytes(folder.globalBytes),
+                                    )
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

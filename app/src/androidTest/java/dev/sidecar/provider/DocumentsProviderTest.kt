@@ -1,6 +1,8 @@
 package dev.sidecar.provider
 
+import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.DocumentsContract.Document
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.sidecar.engine.EngineState
@@ -103,6 +105,42 @@ class DocumentsProviderTest {
             "file should still not be downloaded",
             runBlocking { SyncEngine.entry(folderId, entry.path) }?.isLocallyPresent == false,
         )
+    }
+
+    /**
+     * Search has to reach the global index, not just what is on disk --
+     * otherwise the picker would find nothing on a device that syncs
+     * on demand.
+     */
+    @Test
+    fun searchFindsFilesThatAreNotDownloaded() {
+        val folders = runBlocking { SyncEngine.folders() }
+        assumeTrue("no folders configured", folders.isNotEmpty())
+
+        val sample = folders.firstNotNullOfOrNull { folder ->
+            runBlocking { SyncEngine.browse(folder.id, "") }
+                .firstOrNull { it.isRemoteOnly }
+                ?.let { folder.id to it.name }
+        }
+        assumeTrue("no remote-only file to search for", sample != null)
+
+        val (folderId, name) = sample!!
+        val term = name.substringBeforeLast('.').take(6)
+        val uri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, folderId, term)
+
+        val args = Bundle().apply { putString(DocumentsContract.QUERY_ARG_DISPLAY_NAME, term) }
+        context.contentResolver.query(uri, null, args, null).use { cursor ->
+            requireNotNull(cursor)
+            assertTrue("search returned nothing for '$term'", cursor.count > 0)
+            val nameIndex = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+            val names = buildList {
+                while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+            }
+            assertTrue(
+                "no result contained '$term': $names",
+                names.any { it.contains(term, ignoreCase = true) },
+            )
+        }
     }
 
     private companion object {

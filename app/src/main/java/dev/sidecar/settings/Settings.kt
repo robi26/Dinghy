@@ -7,8 +7,8 @@ import android.content.Context
  * read from a broadcast receiver, where there is no scope to suspend in.
  */
 class Settings(context: Context) {
-    private val prefs =
-        context.applicationContext.getSharedPreferences("sidecar", Context.MODE_PRIVATE)
+    internal val prefs: android.content.SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /** Whether to start syncing on boot. */
     var autoStart: Boolean
@@ -24,14 +24,28 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_SYNC_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_SYNC_ENABLED, value).apply()
 
+    /** Sync over metered connections (mobile data, metered hotspots). */
+    var syncOnMetered: Boolean
+        get() = prefs.getBoolean(KEY_SYNC_ON_METERED, false)
+        set(value) = prefs.edit().putBoolean(KEY_SYNC_ON_METERED, value).apply()
+
+    /** Only sync while charging. */
+    var syncOnlyWhenCharging: Boolean
+        get() = prefs.getBoolean(KEY_ONLY_CHARGING, false)
+        set(value) = prefs.edit().putBoolean(KEY_ONLY_CHARGING, value).apply()
+
     /** Whether the user has been through onboarding. */
     var onboarded: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
 
-    private companion object {
+    companion object {
+        const val PREFS_NAME = "sidecar"
+
         const val KEY_AUTO_START = "auto_start"
         const val KEY_SYNC_ENABLED = "sync_enabled"
+        const val KEY_SYNC_ON_METERED = "sync_on_metered"
+        const val KEY_ONLY_CHARGING = "only_charging"
         const val KEY_ONBOARDED = "onboarded"
     }
 }

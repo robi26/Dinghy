@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
 private sealed interface Screen {
     data object Status : Screen
     data class Browse(val folderId: String, val label: String, val prefix: String) : Screen
+    data class Search(val folderId: String, val label: String) : Screen
 }
 
 @Composable
@@ -92,9 +93,26 @@ private fun SidecarApp() {
             },
         )
 
+        is Screen.Search -> Column(modifier = Modifier.fillMaxSize()) {
+            Text(
+                current.label,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(16.dp),
+            )
+            SearchScreen(folderId = current.folderId)
+        }
+
         is Screen.Browse -> Column(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(current.label, style = MaterialTheme.typography.titleLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(current.label, style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = {
+                        stack = stack + Screen.Search(current.folderId, current.label)
+                    }) { Text("Search") }
+                }
                 Text(
                     "/" + current.prefix.trimEnd('/'),
                     style = MaterialTheme.typography.bodySmall,
@@ -176,6 +194,8 @@ private fun StatusScreen(onOpenFolder: (dev.sidecar.engine.FolderInfo) -> Unit) 
         )
 
         AddDeviceCard(enabled = state is EngineState.Running)
+
+        ConditionsCard()
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(

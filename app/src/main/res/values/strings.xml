@@ -12,6 +12,19 @@
         <item quantity="other">%1$d of %2$d devices connected</item>
     </plurals>
 
+    <string name="status_paused_metered">Paused: waiting for unmetered Wi-Fi</string>
+    <string name="status_paused_charging">Paused: waiting until charging</string>
+    <string name="status_no_network">Waiting for a network</string>
+
+    <string name="settings_title">Sync conditions</string>
+    <string name="settings_metered">Sync on mobile data</string>
+    <string name="settings_metered_summary">Off means sync only on unmetered Wi-Fi</string>
+    <string name="settings_charging">Only sync while charging</string>
+    <string name="settings_charging_summary">Saves battery on long sessions</string>
+
+    <string name="search_hint">Search all files</string>
+    <string name="label_conflict">conflict copy</string>
+
     <string name="action_stop">Stop</string>
     <string name="action_start">Start syncing</string>
     <string name="action_copy">Copy</string>

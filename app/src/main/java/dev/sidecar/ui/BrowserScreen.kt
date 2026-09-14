@@ -151,10 +151,17 @@ private fun EntryRow(entry: EntryInfo, onOpen: () -> Unit, onToggle: (Boolean) -
     }
 }
 
-private fun EntryInfo.subtitle(): String = when {
-    isDirectory -> "folder"
-    isLocallyPresent -> "${formatSize(size)} · on device"
-    else -> "${formatSize(size)} · not downloaded"
+private fun EntryInfo.subtitle(): String = buildString {
+    append(
+        when {
+            isDirectory -> "folder"
+            isLocallyPresent -> "${formatSize(size)} · on device"
+            else -> "${formatSize(size)} · not downloaded"
+        },
+    )
+    // Worth calling out: a conflict copy is a second version of a file that
+    // changed in two places, and it is easy to mistake for a stray duplicate.
+    if (isConflictCopy) append(" · conflict copy")
 }
 
 private fun formatSize(bytes: Long): String {
