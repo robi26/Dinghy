@@ -6,13 +6,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -180,10 +183,17 @@ fun AddFolderScreen(contentPadding: PaddingValues, onAdded: () -> Unit) {
  * nobody will never receive an index, so it is not optional polish.
  */
 @Composable
-fun FolderSettingsScreen(folderId: String, contentPadding: PaddingValues) {
+fun FolderSettingsScreen(
+    folderId: String,
+    contentPadding: PaddingValues,
+    onRemoved: () -> Unit,
+) {
     var devices by remember(folderId) { mutableStateOf<List<DeviceInfo>>(emptyList()) }
     var shares by remember(folderId) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var reload by remember(folderId) { mutableStateOf(0) }
+    var confirmRemove by remember(folderId) { mutableStateOf(false) }
+    var deleteFiles by remember(folderId) { mutableStateOf(false) }
+    var error by remember(folderId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(folderId, reload) {
@@ -240,6 +250,65 @@ fun FolderSettingsScreen(folderId: String, contentPadding: PaddingValues) {
                 }
             }
         }
+
+        error?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        OutlinedButton(onClick = { deleteFiles = false; confirmRemove = true }) {
+            Text(stringResource(R.string.action_remove_folder))
+        }
+    }
+
+    if (confirmRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text(stringResource(R.string.remove_folder_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.remove_folder_body))
+                    // Opt in, not out. Unlinking leaves the downloaded files
+                    // alone; deleting them is not recoverable from in here, so
+                    // it has to be asked for rather than assumed.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = deleteFiles,
+                            onCheckedChange = { deleteFiles = it },
+                        )
+                        Text(
+                            stringResource(R.string.remove_folder_delete),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (deleteFiles) {
+                        Text(
+                            stringResource(R.string.remove_folder_delete_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmRemove = false
+                    scope.launch {
+                        runCatching { SyncEngine.removeFolder(folderId, deleteFiles) }
+                            .onSuccess { onRemoved() }
+                            .onFailure { error = it.message ?: it.javaClass.simpleName }
+                    }
+                }) { Text(stringResource(R.string.action_remove)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemove = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }
 

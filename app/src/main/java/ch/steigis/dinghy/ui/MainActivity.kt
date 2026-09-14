@@ -248,6 +248,9 @@ private fun DinghyApp() {
             is Detail.FolderSettings -> FolderSettingsScreen(
                 folderId = detail.folderId,
                 contentPadding = innerPadding,
+                // All the way out, not one step: the browser underneath this
+                // screen is showing a folder that no longer exists.
+                onRemoved = { stack = emptyList() },
             )
 
             Detail.AddDevice -> TabColumn(innerPadding) {

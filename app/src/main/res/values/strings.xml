@@ -75,6 +75,11 @@
     <string name="action_add_folder">Add folder\u2026</string>
     <string name="action_add_folder_button">Add folder</string>
     <string name="label_folder_settings">Folder settings</string>
+    <string name="action_remove_folder">Remove folder</string>
+    <string name="remove_folder_title">Remove this folder?</string>
+    <string name="remove_folder_body">Dinghy will stop syncing it. The folder stays on your other devices.</string>
+    <string name="remove_folder_delete">Also delete the downloaded files from this device</string>
+    <string name="remove_folder_delete_warning">The files will be gone from this device. They can be downloaded again from a device that still has them.</string>
     <string name="remove_device_body">Dinghy will stop syncing with it. Shared folders stay, without this device in them.</string>
     <string name="action_back">Back</string>
     <string name="cd_folder">Folder</string>

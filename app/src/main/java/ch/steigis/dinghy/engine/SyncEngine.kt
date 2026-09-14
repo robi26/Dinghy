@@ -227,6 +227,23 @@ object SyncEngine {
                 .map { it to folder.isSharedWithDeviceID(it) }
         }
 
+    /**
+     * Stops syncing a folder.
+     *
+     * [deleteLocalFiles] is the whole decision. Unlink drops the folder from the
+     * configuration and leaves whatever was downloaded sitting on the device;
+     * Remove unlinks and then deletes the folder's contents. The second is not
+     * recoverable from inside this app, so the caller has to say which it meant
+     * rather than getting one by default.
+     */
+    suspend fun removeFolder(folderId: String, deleteLocalFiles: Boolean) =
+        withContext(engineDispatcher) {
+            val running = client ?: error("engine is not running")
+            val folder = running.folderWithID(folderId) ?: error("no folder $folderId")
+            if (deleteLocalFiles) folder.remove() else folder.unlink()
+            refreshState()
+        }
+
     suspend fun shareFolder(folderId: String, deviceId: String, share: Boolean) =
         withContext(engineDispatcher) {
             val running = client ?: error("engine is not running")
