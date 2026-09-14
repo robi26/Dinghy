@@ -1,5 +1,7 @@
-# Toolchains (project-local, not committed)
-/toolchains/
+# Toolchains (project-local, not committed). No trailing slash: the
+# directory is sometimes a symlink to a toolchain shared with another
+# checkout, and `/toolchains/` matches only a real directory.
+/toolchains
 
 # Gradle / Android
 .gradle/
