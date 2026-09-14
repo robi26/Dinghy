@@ -113,6 +113,9 @@ private enum class Tab(val labelRes: Int, val iconRes: Int) {
 private sealed interface Detail {
     data class Browse(val folderId: String, val label: String, val prefix: String) : Detail
     data class Search(val folderId: String, val label: String) : Detail
+    data class Device(val deviceId: String, val label: String) : Detail
+    data object ThisDevice : Detail
+    data object AddDevice : Detail
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,6 +140,9 @@ private fun DinghyApp() {
                             when (detail) {
                                 is Detail.Browse -> detail.label
                                 is Detail.Search -> detail.label
+                                is Detail.Device -> detail.label
+                                Detail.ThisDevice -> stringResource(R.string.label_this_device)
+                                Detail.AddDevice -> stringResource(R.string.label_add_device)
                                 null -> stringResource(tab.labelRes)
                             },
                             maxLines = 1,
@@ -145,7 +151,7 @@ private fun DinghyApp() {
                         val crumb = when (detail) {
                             is Detail.Browse -> "/" + detail.prefix.trimEnd('/')
                             is Detail.Search -> stringResource(R.string.action_search)
-                            null -> null
+                            else -> null
                         }
                         if (crumb != null) {
                             Text(
@@ -219,6 +225,21 @@ private fun DinghyApp() {
                 )
             }
 
+            Detail.ThisDevice -> ThisDeviceScreen(innerPadding)
+
+            Detail.AddDevice -> TabColumn(innerPadding) {
+                AddDeviceCard(
+                    enabled = true,
+                    onAdded = { stack = stack.dropLast(1) },
+                )
+            }
+
+            is Detail.Device -> DeviceDetailScreen(
+                deviceId = detail.deviceId,
+                contentPadding = innerPadding,
+                onRemoved = { stack = stack.dropLast(1) },
+            )
+
             is Detail.Browse -> Box(modifier = Modifier.padding(innerPadding)) {
                 BrowserScreen(
                     folderId = detail.folderId,
@@ -231,7 +252,14 @@ private fun DinghyApp() {
 
             null -> tabState.SaveableStateProvider(tab.name) {
                 when (tab) {
-                    Tab.Devices -> DevicesScreen(innerPadding)
+                    Tab.Devices -> DevicesScreen(
+                        contentPadding = innerPadding,
+                        onOpenDevice = { id, label ->
+                            stack = stack + Detail.Device(id, label)
+                        },
+                        onOpenThisDevice = { stack = stack + Detail.ThisDevice },
+                        onAddDevice = { stack = stack + Detail.AddDevice },
+                    )
                     Tab.Folders -> FoldersTab(innerPadding, openFolder)
                 // No folderId: the tab searches every folder. The app bar's
                 // Search action inside a folder narrows it to that one.
@@ -251,7 +279,7 @@ private fun DinghyApp() {
 
 /** Shared column treatment for a tab: insets first, then scroll, then padding. */
 @Composable
-private fun TabColumn(
+internal fun TabColumn(
     contentPadding: PaddingValues,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -264,81 +292,6 @@ private fun TabColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
     )
-}
-
-@Composable
-private fun DevicesScreen(contentPadding: PaddingValues) {
-    val context = LocalContext.current
-    val state by SyncEngine.state.collectAsStateWithLifecycle()
-
-    TabColumn(contentPadding) {
-        // The warnings live here rather than on every tab: this is the landing
-        // tab, and all three of them are reasons the node is not running.
-        SetupWarnings()
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(statusLine(state), style = MaterialTheme.typography.titleMedium)
-
-                if (state is EngineState.Running) {
-                    val running = state as EngineState.Running
-                    Text(
-                        stringResource(R.string.label_device_id),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    // Shown in full rather than ellipsised: this is the string
-                    // the user reads out or compares against another device, so
-                    // truncating it defeats the point. Monospace so the groups
-                    // line up and a transposed character is visible.
-                    Text(
-                        running.deviceId,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextButton(
-                        onClick = { context.copyToClipboard(running.deviceId) },
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text(stringResource(R.string.action_copy))
-                    }
-                    if (running.listenAddresses.isNotEmpty()) {
-                        Text(
-                            running.listenAddresses.joinToString(", "),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    Settings(context).syncEnabled = true
-                    SyncService.start(context)
-                },
-                enabled = state is EngineState.Stopped || state is EngineState.Failed,
-            ) {
-                Text(stringResource(R.string.action_start))
-            }
-            OutlinedButton(
-                onClick = {
-                    Settings(context).syncEnabled = false
-                    SyncService.stop(context)
-                },
-                enabled = state !is EngineState.Stopped,
-            ) {
-                Text(stringResource(R.string.action_stop))
-            }
-        }
-
-        AddDeviceCard(enabled = state is EngineState.Running)
-    }
 }
 
 @Composable
@@ -357,7 +310,37 @@ private fun FoldersTab(
 
 @Composable
 private fun SettingsScreen(contentPadding: PaddingValues) {
+    val context = LocalContext.current
+    val state by SyncEngine.state.collectAsStateWithLifecycle()
+
     TabColumn(contentPadding) {
+        // Engine control lives here rather than on Devices, which is a list of
+        // peers and should stay one.
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(statusLine(state), style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            Settings(context).syncEnabled = true
+                            SyncService.start(context)
+                        },
+                        enabled = state is EngineState.Stopped || state is EngineState.Failed,
+                    ) { Text(stringResource(R.string.action_start)) }
+                    OutlinedButton(
+                        onClick = {
+                            Settings(context).syncEnabled = false
+                            SyncService.stop(context)
+                        },
+                        enabled = state !is EngineState.Stopped,
+                    ) { Text(stringResource(R.string.action_stop)) }
+                }
+            }
+        }
+
         ConditionsCard()
         Text(
             "${stringResource(R.string.label_engine)}: ${Core.coreVersion()}",
@@ -368,7 +351,7 @@ private fun SettingsScreen(contentPadding: PaddingValues) {
 }
 
 @Composable
-private fun statusLine(state: EngineState): String = when (state) {
+internal fun statusLine(state: EngineState): String = when (state) {
     is EngineState.Stopped -> stringResource(R.string.status_stopped)
     is EngineState.Loading -> stringResource(R.string.status_loading)
     is EngineState.Starting -> stringResource(R.string.status_starting)
@@ -388,7 +371,7 @@ private fun statusLine(state: EngineState): String = when (state) {
  * revocable per-app permission.
  */
 @Composable
-private fun SetupWarnings() {
+internal fun SetupWarnings() {
     val context = LocalContext.current
     var refresh by remember { mutableStateOf(0) }
 
@@ -464,7 +447,7 @@ private fun WarningCard(title: String, body: String, action: String, onClick: ()
     }
 }
 
-private fun Context.copyToClipboard(text: String) {
+internal fun Context.copyToClipboard(text: String) {
     getSystemService(ClipboardManager::class.java)
         .setPrimaryClip(ClipData.newPlainText("device id", text))
 }

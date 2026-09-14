@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
  * here too, but the typed form is what makes the app usable headlessly.
  */
 @Composable
-fun AddDeviceCard(enabled: Boolean) {
+fun AddDeviceCard(enabled: Boolean, onAdded: (() -> Unit)? = null) {
     var deviceId by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
@@ -75,6 +75,11 @@ fun AddDeviceCard(enabled: Boolean) {
                             )
                             deviceId = ""
                             address = ""
+                            // Adding is the whole reason for this screen, so
+                            // finishing it should return to the list the new
+                            // device is now in -- not leave the form open with
+                            // a line of text underneath it.
+                            onAdded?.invoke()
                             "Added ${Sushitrain.shortDeviceID(id)}"
                         } catch (t: Throwable) {
                             t.message ?: t.javaClass.simpleName

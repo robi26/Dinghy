@@ -9,6 +9,7 @@ import ch.steigis.dinghy.binding.sushitrain.DownloadDelegate
 import ch.steigis.dinghy.binding.sushitrain.Entry
 import ch.steigis.dinghy.binding.sushitrain.SearchResultDelegate
 import ch.steigis.dinghy.binding.sushitrain.ListOfStrings
+import ch.steigis.dinghy.binding.sushitrain.Peer
 import ch.steigis.dinghy.binding.sushitrain.Sushitrain
 import java.io.File
 import java.util.concurrent.Executors
@@ -142,6 +143,46 @@ object SyncEngine {
         val running = client ?: return@withContext emptyList()
         val ownId = running.deviceID()
         running.peers().toList().filter { it != ownId }
+    }
+
+    /**
+     * Configured peers with everything the device list needs, this device
+     * excluded. Connected peers sort first, then by name, so the ones you can
+     * actually reach are at the top.
+     */
+    suspend fun devices(): List<DeviceInfo> = withContext(engineDispatcher) {
+        val running = client ?: return@withContext emptyList()
+        val ownId = running.deviceID()
+        running.peers().toList()
+            .filter { it != ownId }
+            .mapNotNull { id -> running.peerWithID(id)?.let { describe(it, id) } }
+            .sortedWith(compareByDescending<DeviceInfo> { it.isConnected }
+                .thenBy { it.displayName.lowercase() })
+    }
+
+    suspend fun device(deviceId: String): DeviceInfo? = withContext(engineDispatcher) {
+        val running = client ?: return@withContext null
+        running.peerWithID(deviceId)?.let { describe(it, deviceId) }
+    }
+
+    private fun describe(peer: Peer, deviceId: String) = DeviceInfo(
+        deviceId = deviceId,
+        name = runCatching { peer.name() }.getOrNull().orEmpty(),
+        isConnected = runCatching { peer.isConnected }.getOrDefault(false),
+        isPaused = runCatching { peer.isPaused }.getOrDefault(false),
+        addresses = runCatching { peer.addresses().toList() }.getOrDefault(emptyList()),
+        // lastSeen is a zero Date for a peer that has never connected, which
+        // reads as 1970 rather than "never" unless it is filtered out here.
+        lastSeen = runCatching { peer.lastSeen()?.unixMilliseconds() }
+            .getOrNull()
+            ?.takeIf { it > 0 },
+    )
+
+    /** Forgets a peer. The folders it shared stay, minus this device. */
+    suspend fun removeDevice(deviceId: String) = withContext(engineDispatcher) {
+        val running = client ?: error("engine is not running")
+        running.peerWithID(deviceId)?.remove()
+        refreshState()
     }
 
     // ---- folders -------------------------------------------------------

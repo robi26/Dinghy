@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ascending bars: a connected peer, at a glance and without words. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4,15.5 h2.6 v4 h-2.6 z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M9.1,12 h2.6 v7.5 h-2.6 z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M14.2,8.5 h2.6 v11 h-2.6 z" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M19.3,5 h2.6 v14.5 h-2.6 z" android:fillColor="#FFFFFFFF" />
+</vector>
