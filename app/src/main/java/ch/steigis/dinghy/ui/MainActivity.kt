@@ -95,8 +95,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * The three top-level destinations. Splitting them up is what the bottom bar is
- * for: everything used to be one scroll, so the device ID, the folder list, the
+ * The top-level destinations. Splitting them up is what the bottom bar is for: everything used to be one scroll, so the device ID, the folder list, the
  * add-folder form, the add-device form and the sync settings all competed for
  * the same column.
  */

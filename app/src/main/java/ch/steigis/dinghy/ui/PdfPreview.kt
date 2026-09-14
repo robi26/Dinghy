@@ -40,7 +40,12 @@ import ch.steigis.dinghy.engine.EntryInfo
 import ch.steigis.dinghy.engine.SyncEngine
 import ch.steigis.dinghy.provider.RemoteFileCallback
 import java.io.File
+import kotlin.math.min
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -69,14 +74,31 @@ private class PdfDocument private constructor(
 
     /** PdfRenderer allows one open page at a time and is not thread safe. */
     private val lock = Mutex()
+    private var closed = false
 
-    suspend fun render(index: Int, widthPx: Int): Bitmap = lock.withLock {
+    /**
+     * Teardown runs here rather than on whatever thread disposed the UI, so it
+     * can take [lock] and wait for a render instead of closing underneath one.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Null once closed, which a render racing disposal can observe. */
+    suspend fun render(index: Int, widthPx: Int, maxHeightPx: Int): Bitmap? = lock.withLock {
+        if (closed) return@withLock null
         withContext(Dispatchers.IO) {
             renderer.openPage(index).use { page ->
-                val height = (widthPx.toFloat() * page.height / page.width)
-                    .toInt()
-                    .coerceAtLeast(1)
-                val bitmap = Bitmap.createBitmap(widthPx, height, Bitmap.Config.ARGB_8888)
+                // Fit the page inside both bounds. Scaling by width alone means
+                // a tall, narrow page -- a receipt, a plotted strip -- derives a
+                // height of tens of thousands of pixels and the allocation below
+                // dies of an OutOfMemoryError long before any layout constraint
+                // would have clipped it.
+                val scale = min(
+                    widthPx.toFloat() / page.width,
+                    maxHeightPx.toFloat() / page.height,
+                )
+                val width = (page.width * scale).toInt().coerceAtLeast(1)
+                val height = (page.height * scale).toInt().coerceAtLeast(1)
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 // PDF pages are transparent where nothing is drawn, which on a
                 // dark background renders as unreadable dark-on-dark text.
                 bitmap.eraseColor(Color.WHITE)
@@ -86,10 +108,22 @@ private class PdfDocument private constructor(
         }
     }
 
+    /**
+     * Safe to call while a render is in flight. PdfRenderer's work is native and
+     * uninterruptible, so cancelling the caller does not stop it -- closing the
+     * renderer or its descriptor underneath one is a native crash, not an
+     * exception. Closing therefore queues behind the same lock renders take.
+     */
     fun close() {
-        runCatching { renderer.close() }
-        runCatching { descriptor.close() }
-        thread?.quitSafely()
+        scope.launch {
+            lock.withLock {
+                if (closed) return@withLock
+                closed = true
+                runCatching { renderer.close() }
+                runCatching { descriptor.close() }
+                thread?.quitSafely()
+            }
+        }.invokeOnCompletion { scope.cancel() }
     }
 
     companion object {
@@ -195,13 +229,17 @@ internal fun PdfPreview(folderId: String, entry: EntryInfo, modifier: Modifier =
         // Render at the width it will actually occupy: rendering larger wastes
         // memory on a page that is then scaled down anyway.
         val widthPx = with(density) { maxWidth.toPx() }.toInt().coerceIn(1, 2048)
+        val heightPx = with(density) { maxHeight.toPx() }.toInt().coerceIn(1, 4096)
         val open = document
 
-        LaunchedEffect(open, pageIndex, widthPx) {
+        LaunchedEffect(open, pageIndex, widthPx, heightPx) {
             val doc = open ?: return@LaunchedEffect
-            bitmap = runCatching { doc.render(pageIndex, widthPx) }
+            val rendered = runCatching { doc.render(pageIndex, widthPx, heightPx) }
                 .onFailure { failed = true }
                 .getOrNull()
+            // Null means the document closed while this was queued behind it,
+            // which is disposal rather than a failure.
+            if (rendered != null) bitmap = rendered
         }
 
         val rendered = bitmap
