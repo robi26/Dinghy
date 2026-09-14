@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -121,6 +122,10 @@ private fun DinghyApp() {
     var tab by remember { mutableStateOf(Tab.Devices) }
     var stack by remember { mutableStateOf<List<Detail>>(emptyList()) }
     val detail = stack.lastOrNull()
+    // Holds each tab's saveable state while it is off screen, so switching tabs
+    // -- or pushing the browser on top of one -- does not reset what the user
+    // had typed or how far they had scrolled.
+    val tabState = rememberSaveableStateHolder()
 
     BackHandler(enabled = stack.isNotEmpty()) { stack = stack.dropLast(1) }
 
@@ -207,7 +212,12 @@ private fun DinghyApp() {
         }
         when (detail) {
             is Detail.Search -> Box(modifier = Modifier.padding(innerPadding)) {
-                SearchScreen(folderId = detail.folderId)
+                SearchScreen(
+                    folderId = detail.folderId,
+                    onOpenDirectory = { id, label, prefix ->
+                        stack = stack + Detail.Browse(id, label, prefix)
+                    },
+                )
             }
 
             is Detail.Browse -> Box(modifier = Modifier.padding(innerPadding)) {
@@ -220,15 +230,21 @@ private fun DinghyApp() {
                 )
             }
 
-            null -> when (tab) {
-                Tab.Devices -> DevicesScreen(innerPadding)
-                Tab.Folders -> FoldersTab(innerPadding, openFolder)
+            null -> tabState.SaveableStateProvider(tab.name) {
+                when (tab) {
+                    Tab.Devices -> DevicesScreen(innerPadding)
+                    Tab.Folders -> FoldersTab(innerPadding, openFolder)
                 // No folderId: the tab searches every folder. The app bar's
                 // Search action inside a folder narrows it to that one.
-                Tab.Search -> Box(modifier = Modifier.padding(innerPadding)) {
-                    SearchScreen()
+                    Tab.Search -> Box(modifier = Modifier.padding(innerPadding)) {
+                        SearchScreen(
+                            onOpenDirectory = { id, label, prefix ->
+                                stack = stack + Detail.Browse(id, label, prefix)
+                            },
+                        )
+                    }
+                    Tab.Settings -> SettingsScreen(innerPadding)
                 }
-                Tab.Settings -> SettingsScreen(innerPadding)
             }
         }
     }
