@@ -1,0 +1,6 @@
+Managing folders and devices, without typing IDs.
+
+* Devices found on your network are offered with an Add button
+* Folders can be removed, keeping or deleting the downloaded files
+* On-demand can be switched on or off for a folder you already have
+* File details show when a file last changed, and on which device
