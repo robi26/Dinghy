@@ -63,10 +63,10 @@ fun DevicesScreen(
         if (running != null) {
             SectionLabel(stringResource(R.string.label_this_device))
             Card(modifier = Modifier.fillMaxWidth()) {
-                DeviceRow(
+                NavigationRow(
+                    iconRes = R.drawable.ic_devices,
                     title = stringResource(R.string.label_this_device),
                     subtitle = running.deviceId.substringBefore('-'),
-                    connected = false,
                     onClick = onOpenThisDevice,
                 )
             }
@@ -75,113 +75,47 @@ fun DevicesScreen(
         SectionLabel(stringResource(R.string.label_associated_devices))
         Card(modifier = Modifier.fillMaxWidth()) {
             if (devices.isEmpty()) {
-                Text(
-                    stringResource(R.string.devices_empty),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
+                EmptyNote(stringResource(R.string.devices_empty))
             } else {
                 devices.forEachIndexed { index, device ->
                     if (index > 0) HorizontalDivider()
-                    DeviceRow(
+                    val connected = device.isConnected && !device.isPaused
+                    NavigationRow(
+                        iconRes = R.drawable.ic_devices,
                         title = device.displayName,
                         subtitle = when {
                             device.isPaused -> stringResource(R.string.device_paused)
                             device.isConnected -> stringResource(R.string.device_connected)
                             else -> stringResource(R.string.device_not_connected)
                         },
-                        connected = device.isConnected && !device.isPaused,
                         onClick = { onOpenDevice(device.deviceId, device.displayName) },
+                        // Bars for a live connection, the usual chevron
+                        // otherwise: only one of them says the peer is
+                        // reachable.
+                        trailing = if (connected) {
+                            { ConnectedBars() }
+                        } else {
+                            { RowChevron() }
+                        },
                     )
                 }
             }
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = running != null, onClick = onAddDevice)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_plus),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    stringResource(R.string.action_add_device),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
+        AddCard(
+            text = stringResource(R.string.action_add_device),
+            enabled = running != null,
+            onClick = onAddDevice,
+        )
     }
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp),
+private fun ConnectedBars() {
+    Icon(
+        painter = painterResource(R.drawable.ic_connected),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.tertiary,
+        modifier = Modifier.size(18.dp),
     )
-}
-
-@Composable
-private fun DeviceRow(
-    title: String,
-    subtitle: String,
-    connected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_devices),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        // Bars for a live connection, a chevron otherwise. Both say "there is
-        // more behind this row"; only one of them says the peer is reachable.
-        Icon(
-            painter = painterResource(
-                if (connected) R.drawable.ic_connected else R.drawable.ic_chevron_right,
-            ),
-            contentDescription = null,
-            tint = if (connected) {
-                MaterialTheme.colorScheme.tertiary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(if (connected) 18.dp else 20.dp),
-        )
-    }
 }

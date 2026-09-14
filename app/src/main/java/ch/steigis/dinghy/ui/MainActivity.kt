@@ -116,6 +116,8 @@ private sealed interface Detail {
     data class Device(val deviceId: String, val label: String) : Detail
     data object ThisDevice : Detail
     data object AddDevice : Detail
+    data object AddFolder : Detail
+    data class FolderSettings(val folderId: String, val label: String) : Detail
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,6 +145,8 @@ private fun DinghyApp() {
                                 is Detail.Device -> detail.label
                                 Detail.ThisDevice -> stringResource(R.string.label_this_device)
                                 Detail.AddDevice -> stringResource(R.string.label_add_device)
+                                Detail.AddFolder -> stringResource(R.string.action_add_folder_button)
+                                is Detail.FolderSettings -> detail.label
                                 null -> stringResource(tab.labelRes)
                             },
                             maxLines = 1,
@@ -179,6 +183,15 @@ private fun DinghyApp() {
                         TextButton(onClick = {
                             stack = stack + Detail.Search(detail.folderId, detail.label)
                         }) { Text(stringResource(R.string.action_search)) }
+                        IconButton(onClick = {
+                            stack = stack + Detail.FolderSettings(detail.folderId, detail.label)
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_settings),
+                                contentDescription =
+                                    stringResource(R.string.label_folder_settings),
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -227,6 +240,16 @@ private fun DinghyApp() {
 
             Detail.ThisDevice -> ThisDeviceScreen(innerPadding)
 
+            Detail.AddFolder -> AddFolderScreen(
+                contentPadding = innerPadding,
+                onAdded = { stack = stack.dropLast(1) },
+            )
+
+            is Detail.FolderSettings -> FolderSettingsScreen(
+                folderId = detail.folderId,
+                contentPadding = innerPadding,
+            )
+
             Detail.AddDevice -> TabColumn(innerPadding) {
                 AddDeviceCard(
                     enabled = true,
@@ -260,7 +283,11 @@ private fun DinghyApp() {
                         onOpenThisDevice = { stack = stack + Detail.ThisDevice },
                         onAddDevice = { stack = stack + Detail.AddDevice },
                     )
-                    Tab.Folders -> FoldersTab(innerPadding, openFolder)
+                    Tab.Folders -> FoldersScreen(
+                        contentPadding = innerPadding,
+                        onOpenFolder = openFolder,
+                        onAddFolder = { stack = stack + Detail.AddFolder },
+                    )
                 // No folderId: the tab searches every folder. The app bar's
                 // Search action inside a folder narrows it to that one.
                     Tab.Search -> Box(modifier = Modifier.padding(innerPadding)) {
@@ -292,20 +319,6 @@ internal fun TabColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
     )
-}
-
-@Composable
-private fun FoldersTab(
-    contentPadding: PaddingValues,
-    onOpenFolder: (ch.steigis.dinghy.engine.FolderInfo) -> Unit,
-) {
-    val state by SyncEngine.state.collectAsStateWithLifecycle()
-    TabColumn(contentPadding) {
-        FoldersSection(
-            enabled = state is EngineState.Running,
-            onOpenFolder = onOpenFolder,
-        )
-    }
 }
 
 @Composable
