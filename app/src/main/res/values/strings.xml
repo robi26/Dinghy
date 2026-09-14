@@ -1,4 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sidecar</string>
+
+    <string name="channel_sync">Sync status</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_loading">Opening database…</string>
+    <string name="status_starting">Starting…</string>
+    <string name="status_failed">Failed: %1$s</string>
+    <plurals name="status_connected">
+        <item quantity="one">%1$d of %2$d device connected</item>
+        <item quantity="other">%1$d of %2$d devices connected</item>
+    </plurals>
+
+    <string name="action_stop">Stop</string>
+    <string name="action_start">Start syncing</string>
+    <string name="action_copy">Copy</string>
+
+    <string name="label_device_id">This device</string>
+    <string name="label_folders">Folders</string>
+    <string name="label_engine">Engine</string>
+    <string name="label_add_device">Add device</string>
+    <string name="hint_device_id">Device ID</string>
+    <string name="hint_addresses">Address (optional, e.g. tcp://10.0.2.2:22000)</string>
+    <string name="action_add">Add</string>
+    <string name="error_invalid_id">That is not a valid device ID</string>
+    <string name="added_device">Added %1$s</string>
+
+    <string name="warn_battery_title">Battery optimization is on</string>
+    <string name="warn_battery_body">Android will stop syncing in the background. Allow Sidecar to run unrestricted.</string>
+    <string name="warn_battery_action">Allow</string>
+
+    <string name="warn_network_title">No network permission</string>
+    <string name="warn_network_body">Sidecar cannot reach your other devices. Grant the Network permission in Android settings.</string>
+    <string name="warn_network_action">Open settings</string>
+
+    <string name="warn_notifications_title">Notifications are off</string>
+    <string name="warn_notifications_body">Android requires a notification to keep syncing in the background.</string>
+    <string name="warn_notifications_action">Allow</string>
 </resources>

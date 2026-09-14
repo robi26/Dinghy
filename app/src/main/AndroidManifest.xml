@@ -1,5 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Syncthing's network access. On GrapheneOS this is a revocable
+         per-app/per-profile toggle, so the app must degrade gracefully when it
+         is denied rather than assume connectivity. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Android 17+. Required to reach peers directly on the local network
+         instead of falling back to Syncthing's relays. Unknown permission names
+         are ignored by older platforms, so this is safe to declare against
+         compileSdk 36. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- A foreground service must post a notification to run reliably. Users
+         who do not want it can disable the channel and still grant this. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Needed only to *ask* for the battery-optimization exemption. Without the
+         exemption the system will eventually stop the node. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".SidecarApplication"
@@ -18,6 +44,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.SyncService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <!-- `dataSync` would be the obvious type, but since Android 15 it is
+                 capped at six hours per day, which a sync daemon exceeds. -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Continuously synchronizes files with the user's own devices over Syncthing, which requires a long-lived network connection." />
+        </service>
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true"
+            tools:ignore="UnusedAttribute">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
