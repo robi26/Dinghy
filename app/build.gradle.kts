@@ -52,7 +52,17 @@ val sushitrainSrcDir =
  * needs a distinct, increasing code for update checks to work.
  */
 val baseVersionCode = 1
-val versionNameValue = "0.1.0"
+
+/**
+ * Version name. CI exports VERSION_NAME from the git tag (minus its `v`) so a
+ * release is named after the tag it was built from rather than a constant that
+ * has to be remembered and bumped by hand; `-PversionName=` does the same
+ * locally. The fallback is what an untagged build reports.
+ */
+val versionNameValue: String =
+    (findProperty("versionName") as String?)?.takeIf { it.isNotBlank() }
+        ?: System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() }
+        ?: "0.1.0"
 
 /** Stable ordinal per ABI; must never be reordered once released. */
 fun abiOrdinal(abi: String): Int = when (abi) {

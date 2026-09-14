@@ -90,7 +90,12 @@ it over an existing one, and Android will refuse anyway.
 
 Releases are built by CI on a `v*` tag: each ABI is built and signed separately,
 the signature is verified in the job, and the APKs are attached to the GitHub
-release along with the Obtainium manifest and checksums.
+release along with the Obtainium manifest and checksums. The tag names the
+release — CI exports `VERSION_NAME` from it (minus the `v`), which sets the
+`versionName` the app reports, the APK filenames and the version in the
+Obtainium manifest, so those three cannot drift apart. Running the workflow
+manually (`workflow_dispatch`) builds and verifies the signed APKs but publishes
+nothing, since there is no tag to publish to.
 
 Signing credentials come from repository secrets:
 `DINGHY_KEYSTORE_BASE64`, `DINGHY_KEYSTORE_PASSWORD`, `DINGHY_KEY_ALIAS` and
@@ -99,14 +104,17 @@ Signing credentials come from repository secrets:
 enough to check that R8 is happy.
 
 ```bash
-./gradlew :app:dist -Pabi=arm64-v8a    # signed APK into dist/
+./gradlew :app:dist -Pabi=arm64-v8a                    # signed APK into dist/
+./gradlew :app:dist -Pabi=arm64-v8a -PversionName=0.2.0  # as CI builds a tag
 ```
 
 **Version codes.** `splits.abi` does nothing on AGP 9, so per-ABI APKs come from
 separate builds and each needs its own increasing version code. The code is
 `baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (armeabi-v7a 1,
 arm64-v8a 3, x86_64 4) — so 0.1.0 publishes as 11, 13 and 14. The ordinals must
-never be reordered once released.
+never be reordered once released. Unlike the version name, `baseVersionCode` is
+not derived from the tag: bump it in `app/build.gradle.kts` before tagging, or
+Android and Obtainium will not see the release as an update.
 
 **Reproducible builds** are not claimed yet. The Go toolchain and gomobile make
 bit-identical output harder than for a pure-Kotlin app, and that has not been

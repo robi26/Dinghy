@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   core:
@@ -44,12 +45,15 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
+      - uses: android-actions/setup-android@v3
+
       - name: Install NDK
-        run: |
-          echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "ndk;30.0.16248370"
+        run: sdkmanager --install "ndk;30.0.16248370"
 
       - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest -Pabi=${{ matrix.abi }}
 
       - name: Assemble
         run: ./gradlew :app:assembleDebug -Pabi=${{ matrix.abi }}
@@ -58,3 +62,5 @@ jobs:
         with:
           name: dinghy-debug-${{ matrix.abi }}
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

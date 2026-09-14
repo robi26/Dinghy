@@ -31,10 +31,10 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
+      - uses: android-actions/setup-android@v3
+
       - name: Install NDK
-        run: |
-          echo "y" | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "ndk;30.0.16248370"
+        run: sdkmanager --install "ndk;30.0.16248370"
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -54,7 +54,18 @@ jobs:
           DINGHY_KEYSTORE_PASSWORD: ${{ secrets.DINGHY_KEYSTORE_PASSWORD }}
           DINGHY_KEY_ALIAS: ${{ secrets.DINGHY_KEY_ALIAS }}
           DINGHY_KEY_PASSWORD: ${{ secrets.DINGHY_KEY_PASSWORD }}
-        run: ./gradlew :app:dist -Pabi=${{ matrix.abi }}
+        run: |
+          # The tag names the release: the APK filenames, the versionName the app
+          # reports and the Obtainium manifest all have to agree, so they are all
+          # derived from it rather than from a constant in the build file. A
+          # workflow_dispatch run has no tag and falls back to the build default.
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION_NAME="${TAG#v}"
+            echo "Building version $VERSION_NAME from tag $TAG"
+            export VERSION_NAME
+          fi
+          ./gradlew :app:dist -Pabi=${{ matrix.abi }}
 
       - name: Verify it is actually signed
         run: |
@@ -66,9 +77,12 @@ jobs:
         with:
           name: dinghy-${{ matrix.abi }}
           path: dist/*.apk
+          if-no-files-found: error
 
   publish:
     needs: build
+    # A workflow_dispatch run builds and verifies but has no tag to publish to.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,6 +108,10 @@ jobs:
               # ABI names contain dashes, so a greedy match yields "v8a".
               abi="${name#dinghy-${VERSION}-}"
               abi="${abi%.apk}"
+              if [ "$abi" = "${name%.apk}" ]; then
+                echo "::error::$name is not named for version $VERSION" >&2
+                exit 1
+              fi
               [ $first -eq 0 ] && echo ','
               first=0
               printf '    {"abi": "%s", "name": "%s", "url": "%s/%s", "sha256": "%s"}' \
