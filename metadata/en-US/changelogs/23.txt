@@ -1,0 +1,6 @@
+Fixes a first release that could not start.
+
+The sync engine checks the version string it is built with and exits if it
+does not match the form it expects. CI built 0.1.0 with a bare commit hash
+rather than a version, so the app closed immediately on launch, on every
+architecture. Nothing else has changed.

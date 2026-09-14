@@ -51,7 +51,7 @@ val sushitrainSrcDir =
  * does nothing on AGP 9, so per-ABI APKs come from separate builds and each
  * needs a distinct, increasing code for update checks to work.
  */
-val baseVersionCode = 1
+val baseVersionCode = 2
 
 /**
  * Version name. CI exports VERSION_NAME from the git tag (minus its `v`) so a
@@ -76,13 +76,33 @@ val minSdkVersion = 26
 val ndkVersionUsed = "30.0.16248370"
 
 /**
- * Version reported by the engine. Syncthing reads this from a linker-set
- * variable; without it the app reports "unknown-dev".
+ * Syncthing's own validation of the version string it is given. It checks this
+ * in an init() and calls log.Fatalf -- os.Exit(1) -- on a mismatch, so an
+ * invalid string does not degrade to a wrong version number: the engine kills
+ * the process the moment it loads, with no crash, no tombstone and no Java
+ * stack trace. Kept byte-for-byte in sync with allowedVersionExp in
+ * syncthing/lib/build/build.go.
+ */
+val syncthingVersionExp =
+    Regex("""^v\d+\.\d+\.\d+(-[a-z0-9]+)*(\.\d+)*(\+\d+-g[0-9a-f]+|\+[0-9a-z]+)?(-[^\s]+)?$""")
+
+/**
+ * Version reported by the engine, injected into Syncthing's linker-set
+ * build.Version.
+ *
+ * `git describe --tags` falls back to a bare commit hash whenever no tag is
+ * reachable, and that is the normal case in CI: actions/checkout clones the
+ * submodule shallow, so sushitrain's tags are absent and describe yields
+ * something like "c3a7644", which fails the check above. Only the literal
+ * "unknown-dev" is exempt from validation, so anything unusable becomes that
+ * rather than a plausible-looking string that stops the app from starting.
  */
 val engineVersion: String = providers.exec {
     commandLine("git", "describe", "--tags", "--always", "--dirty")
     workingDir = rootProject.file("external/sushitrain")
-}.standardOutput.asText.map { it.trim() }.orElse("unknown").get()
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.orElse("").get()
+    .let { if (syncthingVersionExp.matches(it)) it else "unknown-dev" }
 
 // AGP 9 exposes the SDK/NDK locations as providers rather than as properties on
 // the `android` extension.

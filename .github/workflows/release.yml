@@ -20,6 +20,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Submodules are cloned at the same depth as the parent. Without full
+          # history sushitrain has no tags, `git describe --tags` degrades to a
+          # bare commit hash, and Syncthing refuses to start on it.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:

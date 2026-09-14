@@ -62,6 +62,13 @@ drives `gomobile` itself (`gomobileTools` → `gomobileBind` → `preBuild`).
   time. An all-ABI APK is ~83 MiB; a single-ABI debug APK is ~36 MiB, ~27 MiB release.
 - R8 needs a keep rule for classes implementing the binding's callback interfaces:
   Go calls them through JNI, so R8 sees no reference. See `app/proguard-rules.pro`.
+- Syncthing validates the version string it is linked with and calls `log.Fatalf`
+  on a mismatch, so a bad value does not report a wrong version — the app exits on
+  launch with no crash and no Java stack trace. `git describe --tags` degrades to a
+  bare commit hash whenever no tag is reachable, which is what a shallow submodule
+  clone gives you, so CI checks out with `fetch-depth: 0` and the build falls back
+  to `unknown-dev` (the one value Syncthing exempts) for anything that fails its
+  regexp.
 
 ## Installing
 
@@ -111,10 +118,10 @@ enough to check that R8 is happy.
 **Version codes.** `splits.abi` does nothing on AGP 9, so per-ABI APKs come from
 separate builds and each needs its own increasing version code. The code is
 `baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (armeabi-v7a 1,
-arm64-v8a 3, x86_64 4) — so 0.1.0 publishes as 11, 13 and 14. The ordinals must
-never be reordered once released. Unlike the version name, `baseVersionCode` is
-not derived from the tag: bump it in `app/build.gradle.kts` before tagging, or
-Android and Obtainium will not see the release as an update.
+arm64-v8a 3, x86_64 4) — so `baseVersionCode = 2` publishes as 21, 23 and 24.
+The ordinals must never be reordered once released. Unlike the version name,
+`baseVersionCode` is not derived from the tag: bump it in `app/build.gradle.kts`
+before tagging, or Android and Obtainium will not see the release as an update.
 
 **Reproducible builds** are not claimed yet. The Go toolchain and gomobile make
 bit-identical output harder than for a pure-Kotlin app, and that has not been
