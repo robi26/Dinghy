@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
 private enum class Tab(val labelRes: Int, val iconRes: Int) {
     Devices(R.string.tab_devices, R.drawable.ic_devices),
     Folders(R.string.tab_folders, R.drawable.ic_folder),
+    Search(R.string.tab_search, R.drawable.ic_search),
     Settings(R.string.tab_settings, R.drawable.ic_settings),
 }
 
@@ -222,6 +223,11 @@ private fun DinghyApp() {
             null -> when (tab) {
                 Tab.Devices -> DevicesScreen(innerPadding)
                 Tab.Folders -> FoldersTab(innerPadding, openFolder)
+                // No folderId: the tab searches every folder. The app bar's
+                // Search action inside a folder narrows it to that one.
+                Tab.Search -> Box(modifier = Modifier.padding(innerPadding)) {
+                    SearchScreen()
+                }
                 Tab.Settings -> SettingsScreen(innerPadding)
             }
         }

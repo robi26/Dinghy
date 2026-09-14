@@ -33,6 +33,15 @@ data class EntryInfo(
     val isSelected: Boolean,
     /** A Syncthing conflict copy, e.g. "notes.sync-conflict-20260101-120000-ABCDEFG.md". */
     val isConflictCopy: Boolean = false,
+    /**
+     * Folder this entry belongs to. Only filled in by search, and only there
+     * because a search across every folder returns paths that are relative to
+     * their own folder root -- without this, two files called notes.md in
+     * different folders are indistinguishable. Browsing already knows which
+     * folder it is in, so it leaves these empty.
+     */
+    val folderId: String = "",
+    val folderLabel: String = "",
 ) {
     /** Listed in the index but not stored locally -- the on-demand case. */
     val isRemoteOnly: Boolean get() = !isDirectory && !isLocallyPresent

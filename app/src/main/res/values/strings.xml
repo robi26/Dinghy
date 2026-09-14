@@ -39,6 +39,7 @@
     <string name="action_search">Search</string>
     <string name="tab_devices">Devices</string>
     <string name="tab_folders">Folders</string>
+    <string name="tab_search">Search</string>
     <string name="tab_settings">Settings</string>
     <string name="action_back">Back</string>
     <string name="cd_folder">Folder</string>
