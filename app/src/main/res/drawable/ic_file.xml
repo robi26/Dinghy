@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Body and the folded corner, so a file never reads as a folder. -->
+    <path
+        android:pathData="M13.5,3.5 H7 a1.5,1.5 0 0 0 -1.5,1.5 v14 a1.5,1.5 0 0 0 1.5,1.5 h10 a1.5,1.5 0 0 0 1.5,-1.5 V8.5 z M13.5,3.5 V8.5 h5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineJoin="round" />
+</vector>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark counterpart of values/themes.xml; see the note there. -->
+    <style name="Theme.Dinghy" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#121316</item>
+    </style>
+</resources>

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +24,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ch.steigis.dinghy.R
 import ch.steigis.dinghy.engine.EntryInfo
 import ch.steigis.dinghy.engine.SyncEngine
 import kotlinx.coroutines.delay
@@ -132,9 +136,25 @@ private fun EntryRow(entry: EntryInfo, onOpen: () -> Unit, onToggle: (Boolean) -
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // A folder and a file used to be distinguished only by a trailing
+        // slash, which is easy to miss when scanning a long list. The icon
+        // carries that now, so the slash is gone.
+        Icon(
+            painter = painterResource(
+                if (entry.isDirectory) R.drawable.ic_folder else R.drawable.ic_file,
+            ),
+            contentDescription = stringResource(
+                if (entry.isDirectory) R.string.cd_folder else R.string.cd_file,
+            ),
+            tint = if (entry.isDirectory) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                if (entry.isDirectory) "${entry.name}/" else entry.name,
+                entry.name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (entry.isDirectory) FontWeight.Medium else FontWeight.Normal,
             )
