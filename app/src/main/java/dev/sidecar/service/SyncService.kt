@@ -67,7 +67,11 @@ class SyncService : LifecycleService() {
                 .distinctUntilChanged()
                 .collectLatest { allowed ->
                     blockedBy = allowed
-                    SyncEngine.setPeersPaused(allowed != SyncAllowed.Yes)
+                    val syncing = allowed == SyncAllowed.Yes
+                    SyncEngine.setPeersPaused(!syncing)
+                    // Tied to the same condition as pausing: no point keeping
+                    // the radio unfiltered when no peer is allowed to talk.
+                    discoveryLock.setHeld(syncing)
                     if (isForegroundStarted) {
                         notificationManager.notify(
                             NOTIFICATION_ID,
@@ -83,6 +87,7 @@ class SyncService : LifecycleService() {
 
         if (intent?.action == ACTION_STOP) {
             Log.i(TAG, "stop requested")
+            discoveryLock.setHeld(false)
             lifecycleScope.launch {
                 SyncEngine.stop()
                 stopSelf()
@@ -99,6 +104,7 @@ class SyncService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        discoveryLock.setHeld(false)
         // The engine deliberately outlives a bare unbind but not the service:
         // if the service is going away, the node should stop cleanly so the
         // database lock is released.
@@ -113,6 +119,9 @@ class SyncService : LifecycleService() {
 
     private var isForegroundStarted = false
     private var blockedBy: SyncAllowed = SyncAllowed.Yes
+
+    /** Without this, peers on the same Wi-Fi are never discovered. */
+    private val discoveryLock by lazy { DiscoveryLock(this) }
 
     private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
 

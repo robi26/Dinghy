@@ -14,6 +14,12 @@
          compileSdk 36. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
+    <!-- Local peer discovery is a UDP broadcast plus an IPv6 multicast, and
+         Wi-Fi power save filters both out unless a multicast lock is held.
+         Without this, devices on the same network are never found and
+         addresses have to be entered by hand. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
     <!-- A foreground service must post a notification to run reliably. Users
          who do not want it can disable the channel and still grant this. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
