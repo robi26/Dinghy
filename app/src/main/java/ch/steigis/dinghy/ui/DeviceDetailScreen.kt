@@ -31,6 +31,7 @@ import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.SyncEngine
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** This device: the id another device needs, and where it is listening. */
@@ -98,7 +99,12 @@ fun DeviceDetailScreen(
     var confirmRemove by remember(deviceId) { mutableStateOf(false) }
     var error by remember(deviceId) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(deviceId, state) { device = SyncEngine.device(deviceId) }
+    LaunchedEffect(deviceId, state) {
+        while (true) {
+            device = SyncEngine.device(deviceId)
+            delay(PEER_REFRESH_MILLIS)
+        }
+    }
 
     TabColumn(contentPadding) {
         val current = device

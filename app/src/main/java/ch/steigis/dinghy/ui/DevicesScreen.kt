@@ -30,6 +30,7 @@ import ch.steigis.dinghy.R
 import ch.steigis.dinghy.engine.DeviceInfo
 import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.SyncEngine
+import kotlinx.coroutines.delay
 
 /**
  * The device list.
@@ -51,10 +52,14 @@ fun DevicesScreen(
     val running = state as? EngineState.Running
     var devices by remember { mutableStateOf<List<DeviceInfo>>(emptyList()) }
 
-    // Keyed on the engine state so the list re-reads when a peer connects or
-    // drops, which is what changes the indicator.
+    // Keyed on the engine state so a connect or drop shows immediately, and
+    // repeating because the state flow alone does not carry everything a row
+    // shows -- see PEER_REFRESH_MILLIS.
     LaunchedEffect(state) {
-        devices = if (running != null) SyncEngine.devices() else emptyList()
+        while (true) {
+            devices = if (running != null) SyncEngine.devices() else emptyList()
+            delay(PEER_REFRESH_MILLIS)
+        }
     }
 
     TabColumn(contentPadding) {

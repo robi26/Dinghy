@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +31,7 @@ import ch.steigis.dinghy.engine.DeviceInfo
 import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.FolderInfo
 import ch.steigis.dinghy.engine.SyncEngine
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -55,7 +57,10 @@ fun FoldersScreen(
     var folders by remember { mutableStateOf<List<FolderInfo>>(emptyList()) }
 
     LaunchedEffect(state) {
-        folders = if (running) SyncEngine.folders() else emptyList()
+        while (true) {
+            folders = if (running) SyncEngine.folders() else emptyList()
+            delay(PEER_REFRESH_MILLIS)
+        }
     }
 
     TabColumn(contentPadding) {
@@ -95,7 +100,14 @@ private fun FolderInfo.summary(): String = buildString {
         },
     )
     if (isPaused) append(" · ${stringResource(R.string.folder_paused)}")
-    append(" · ${stringResource(R.string.folder_files, globalFiles)}")
+    append(
+        " · " + pluralStringResource(
+            R.plurals.folder_files,
+            // Counts this large are not real, but the cast has to be total.
+            globalFiles.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            globalFiles,
+        ),
+    )
     // The point of the app: stored is normally a small fraction of visible.
     append(" · ${formatBytes(localBytes)} of ${formatBytes(globalBytes)}")
 }
@@ -175,8 +187,11 @@ fun FolderSettingsScreen(folderId: String, contentPadding: PaddingValues) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(folderId, reload) {
-        devices = SyncEngine.devices()
-        shares = SyncEngine.folderShares(folderId).toMap()
+        while (true) {
+            devices = SyncEngine.devices()
+            shares = SyncEngine.folderShares(folderId).toMap()
+            delay(PEER_REFRESH_MILLIS)
+        }
     }
 
     TabColumn(contentPadding) {

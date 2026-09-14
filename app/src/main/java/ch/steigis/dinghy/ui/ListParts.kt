@@ -91,11 +91,29 @@ internal fun RowChevron() {
 }
 
 /**
+ * How often a screen re-reads peer state while it is open.
+ *
+ * Reacting to the engine's state flow alone is not enough: it carries counts,
+ * and it is a data class, so a peer whose name or last-seen changed without
+ * changing any count produces a value equal to the previous one, which a
+ * StateFlow drops. Anything that shows per-peer detail would then sit stale
+ * until a count happened to move.
+ */
+internal const val PEER_REFRESH_MILLIS = 3_000L
+
+/**
  * The "Add …" button that closes a list. A card of its own rather than a row
  * inside the list: adding is not one of the things listed.
  */
 @Composable
 internal fun AddCard(text: String, enabled: Boolean, onClick: () -> Unit) {
+    // Disabled has to look disabled: in primary colour it reads as tappable and
+    // then does nothing, which is worse than being visibly unavailable.
+    val tint = if (enabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -108,14 +126,10 @@ internal fun AddCard(text: String, enabled: Boolean, onClick: () -> Unit) {
             Icon(
                 painter = painterResource(R.drawable.ic_plus),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = tint,
                 modifier = Modifier.size(20.dp),
             )
-            Text(
-                text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = tint)
         }
     }
 }

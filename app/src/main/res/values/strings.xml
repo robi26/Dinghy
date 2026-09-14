@@ -64,7 +64,10 @@
     <string name="folder_on_demand">on-demand</string>
     <string name="folder_full_sync">full sync</string>
     <string name="folder_paused">paused</string>
-    <string name="folder_files">%1$d files</string>
+    <plurals name="folder_files">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
     <string name="hint_folder_id">Folder ID</string>
     <string name="hint_folder_id_help">Must match the folder ID on your other device.</string>
     <string name="folder_on_demand_title">On-demand</string>
