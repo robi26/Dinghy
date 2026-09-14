@@ -1,0 +1,9 @@
+Devices and Folders are lists now.
+
+* Devices shows your devices, with an icon for which are connected
+* Tap a device for its details, or to remove it
+* Folders shows one row per folder, with what it syncs and what it stores
+* Add device and Add folder are buttons under each list, and return to it
+* Folder sharing moved behind the folder, and names devices properly
+* Start and Stop moved to Settings
+* Connection state updates while you are looking at it

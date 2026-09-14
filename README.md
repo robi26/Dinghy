@@ -119,7 +119,7 @@ enough to check that R8 is happy.
 **Version codes.** `splits.abi` does nothing on AGP 9, so per-ABI APKs come from
 separate builds and each needs its own increasing version code. The code is
 `baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (arm64-v8a 3,
-x86_64 4) — so `baseVersionCode = 3` publishes as 33 and 34. Retired ABIs keep
+x86_64 4) — so `baseVersionCode = 4` publishes as 43 and 44. Retired ABIs keep
 their ordinal rather than freeing it: armeabi-v7a held 1 and shipped as 11
 and 21, so 1 can never mean anything else.
 The ordinals must never be reordered once released. Unlike the version name,
