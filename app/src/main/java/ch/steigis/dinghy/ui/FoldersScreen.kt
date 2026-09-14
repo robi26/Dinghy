@@ -50,13 +50,9 @@ fun FoldersSection(enabled: Boolean, onOpenFolder: (FolderInfo) -> Unit) {
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
+        // No "Folders" heading here: the tab this sits on is already called
+        // Folders, and the app bar says so.
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(
-                "Folders",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
             if (folders.isEmpty()) {
                 Text(
                     "No folders yet. Add one with the same ID as on your other device.",

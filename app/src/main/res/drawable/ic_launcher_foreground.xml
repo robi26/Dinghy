@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!--
+      A dinghy under sail. There is no mast: the sails are separated by a gap of
+      background instead, which reads as one at icon sizes and avoids a heavy
+      dark bar through the middle of the mark.
+
+      Only the centre 72dp of the 108dp layer is guaranteed visible, so the
+      whole mark is drawn small and scaled up about its own centre. Every point
+      stays within ~30dp of centre, comfortably inside the 36dp radius a
+      circular mask leaves. Corners are rounded by stroking each shape in its
+      own fill colour rather than by fattening the path data.
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="1.18"
+        android:scaleY="1.18">
+
+        <!-- jib -->
+        <path
+            android:pathData="M52,36 C47,41 41,47 36,52 L52,52 Z"
+            android:fillColor="#FFFB7185"
+            android:strokeColor="#FFFB7185"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round" />
+
+        <!-- mainsail -->
+        <path
+            android:pathData="M56,30 C64,36 70,45 74,52 L56,52 Z"
+            android:fillColor="#FFFBBF24"
+            android:strokeColor="#FFFBBF24"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round" />
+
+        <!-- hull -->
+        <path
+            android:pathData="M32,54 L76,54 C74.5,63 66,68.5 54,68.5 C42,68.5 33.5,63 32,54 Z"
+            android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.8"
+            android:strokeLineJoin="round" />
+
+        <!-- water -->
+        <path
+            android:pathData="M37,75 c4.5,-3 9,-3 13.5,0 c4.5,3 9,3 13.5,0 c3,-2 6,-2.4 9,-1"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeAlpha="0.55"
+            android:strokeWidth="3.2"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

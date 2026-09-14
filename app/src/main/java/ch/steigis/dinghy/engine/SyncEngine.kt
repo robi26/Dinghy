@@ -293,6 +293,9 @@ object SyncEngine {
                 override fun result(entry: Entry?) {
                     val e = entry ?: return
                     runCatching {
+                        // A search with no folderId spans every folder, so each
+                        // result has to carry its own.
+                        val folder = runCatching { e.folder }.getOrNull()
                         results.add(
                             EntryInfo(
                                 name = e.fileName(),
@@ -303,6 +306,10 @@ object SyncEngine {
                                 isExplicitlySelected = e.isExplicitlySelected,
                                 isSelected = e.isSelected,
                                 isConflictCopy = e.isConflictCopy,
+                                folderId = folder?.folderID.orEmpty(),
+                                folderLabel = folder?.let {
+                                    runCatching { it.label() }.getOrNull()?.ifEmpty { null }
+                                } ?: folder?.folderID.orEmpty(),
                             ),
                         )
                     }

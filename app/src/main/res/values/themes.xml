@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Dinghy" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Compose paints everything, so this theme only really governs the window
+      before the first frame. That still matters: the window background is what
+      shows during launch, and a light-only theme flashes white on the way into
+      a dark-mode app. The colour matches DinghyTheme's `background`, and
+      values-night carries the dark counterpart.
+    -->
+    <style name="Theme.Dinghy" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FBFBFE</item>
+    </style>
 </resources>

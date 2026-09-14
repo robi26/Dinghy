@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!--
+      Flat 24dp glyph for the status bar, the quick-settings tile and anywhere
+      else the system wants a single-colour mark. Notification icons are used as
+      an alpha mask and tinted by the system, so this is deliberately white on
+      transparent: any colour here would be discarded.
+
+      Same sails and hull as the launcher icon, but the water is dropped — at
+      status-bar size it reads as noise rather than as water. The paths are the
+      launcher icon's own coordinates, mapped into the 24dp viewport by the
+      group below rather than re-derived by hand, so the two marks stay the same
+      shape. Android applies a group as (p - pivot) * scale + (translate +
+      pivot), which puts the mark's centre (54, 49.25) at (12, 12).
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="49.25"
+        android:scaleX="0.45"
+        android:scaleY="0.45"
+        android:translateX="-42"
+        android:translateY="-37.25">
+
+        <!-- jib -->
+        <path
+            android:pathData="M52,36 C47,41 41,47 36,52 L52,52 Z"
+            android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round" />
+
+        <!-- mainsail -->
+        <path
+            android:pathData="M56,30 C64,36 70,45 74,52 L56,52 Z"
+            android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round" />
+
+        <!-- hull -->
+        <path
+            android:pathData="M32,54 L76,54 C74.5,63 66,68.5 54,68.5 C42,68.5 33.5,63 32,54 Z"
+            android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.8"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

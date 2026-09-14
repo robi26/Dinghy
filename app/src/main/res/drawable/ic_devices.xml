@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- A tablet and a phone: two peers, which is what a device list is. -->
+    <path
+        android:pathData="M4,4.5 h9 a1.5,1.5 0 0 1 1.5,1.5 v9 a1.5,1.5 0 0 1 -1.5,1.5 H4 a1.5,1.5 0 0 1 -1.5,-1.5 V6 a1.5,1.5 0 0 1 1.5,-1.5 z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M17.5,10.5 h2 a1.5,1.5 0 0 1 1.5,1.5 v7 a1.5,1.5 0 0 1 -1.5,1.5 h-2 a1.5,1.5 0 0 1 -1.5,-1.5 v-7 a1.5,1.5 0 0 1 1.5,-1.5 z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineJoin="round" />
+</vector>

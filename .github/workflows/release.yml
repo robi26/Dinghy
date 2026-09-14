@@ -15,9 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        abi: [arm64-v8a, x86_64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           # Submodules are cloned at the same depth as the parent. Without full
@@ -25,22 +25,22 @@ jobs:
           # bare commit hash, and Syncthing refuses to start on it.
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       - name: Install NDK
         run: sdkmanager --install "ndk;30.0.16248370"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Decode keystore
         env:
@@ -77,7 +77,7 @@ jobs:
           "$APKSIGNER" verify --verbose dist/*.apk | tee /tmp/verify.txt
           grep -q "v2 scheme (APK Signature Scheme v2): true" /tmp/verify.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dinghy-${{ matrix.abi }}
           path: dist/*.apk
@@ -89,9 +89,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -130,7 +130,7 @@ jobs:
       - name: Checksums
         run: cd dist && sha256sum *.apk > SHA256SUMS
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*.apk

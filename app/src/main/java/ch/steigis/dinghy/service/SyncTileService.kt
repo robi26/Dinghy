@@ -37,7 +37,7 @@ class SyncTileService : TileService() {
         val running = SyncEngine.isRunning
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = getString(R.string.app_name)
-        tile.icon = Icon.createWithResource(this, android.R.drawable.stat_sys_upload_done)
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_dinghy_mono)
         tile.updateTile()
     }
 }

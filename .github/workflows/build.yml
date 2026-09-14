@@ -11,14 +11,14 @@ jobs:
     name: Go core tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           # Submodules are cloned at the same depth as the parent. Without full
           # history sushitrain has no tags, `git describe --tags` degrades to a
           # bare commit hash, and Syncthing refuses to start on it.
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
@@ -33,9 +33,9 @@ jobs:
       fail-fast: false
       matrix:
         # splits.abi is a no-op on AGP 9, so each ABI is a separate build.
-        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        abi: [arm64-v8a, x86_64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           # Submodules are cloned at the same depth as the parent. Without full
@@ -43,22 +43,22 @@ jobs:
           # bare commit hash, and Syncthing refuses to start on it.
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       - name: Install NDK
         run: sdkmanager --install "ndk;30.0.16248370"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest -Pabi=${{ matrix.abi }}
@@ -66,7 +66,7 @@ jobs:
       - name: Assemble
         run: ./gradlew :app:assembleDebug -Pabi=${{ matrix.abi }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dinghy-debug-${{ matrix.abi }}
           path: app/build/outputs/apk/debug/*.apk

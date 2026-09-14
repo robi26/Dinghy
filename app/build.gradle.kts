@@ -15,8 +15,13 @@ plugins {
 // only via $PATH, so both binaries are built into toolchains/bin first.
 // ---------------------------------------------------------------------------
 
-/** ABIs we ship. x86 is omitted: no realistic 32-bit x86 Android targets remain. */
-val abiFilters = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+/**
+ * ABIs we ship. x86 is omitted: no realistic 32-bit x86 Android targets remain.
+ * armeabi-v7a was dropped after 0.1.1 for the same reason — 32-bit ARM devices
+ * predate arm64, which Android has required for every new device since 2021,
+ * and they are the worst fit for an app whose engine alone is ~25 MiB.
+ */
+val abiFilters = listOf("arm64-v8a", "x86_64")
 
 fun goArchFor(abi: String): String = when (abi) {
     "arm64-v8a" -> "arm64"
@@ -64,7 +69,11 @@ val versionNameValue: String =
         ?: System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() }
         ?: "0.1.0"
 
-/** Stable ordinal per ABI; must never be reordered once released. */
+/**
+ * Stable ordinal per ABI; must never be reordered once released. armeabi-v7a is
+ * retired but keeps its ordinal: 1 was published as version code 11 and 21, so
+ * it can never be handed to a different ABI.
+ */
 fun abiOrdinal(abi: String): Int = when (abi) {
     "armeabi-v7a" -> 1
     "arm64-v8a" -> 3
@@ -330,6 +339,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

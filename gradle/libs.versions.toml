@@ -4,7 +4,10 @@ kotlin = "2.3.0"
 coreKtx = "1.17.0"
 lifecycle = "2.9.4"
 activityCompose = "1.11.0"
-composeBom = "2025.09.00"
+composeBom = "2026.06.01"
+# 3.4.0, not the latest 3.6.x: those require compileSdk 37, and nothing in the
+# preview needs them. Staying here keeps the compile target at 36.
+coil = "3.4.0"
 coroutines = "1.10.2"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
@@ -23,6 +26,10 @@ androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lif
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+# Coil 3 does not fetch over the network on its own; the URL previews use is
+# the engine's localhost streaming server, so it needs a network fetcher.
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

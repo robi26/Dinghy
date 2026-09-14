@@ -174,7 +174,7 @@ class SyncService : LifecycleService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+            .setSmallIcon(R.drawable.ic_dinghy_mono)
             .setContentIntent(open)
             .addAction(0, getString(R.string.action_stop), stop)
             .setOngoing(true)
