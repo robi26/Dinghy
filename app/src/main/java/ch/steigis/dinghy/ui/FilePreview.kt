@@ -42,11 +42,10 @@ import kotlinx.coroutines.withContext
  * streaming server, so a file that is not on the device previews by pulling
  * only the blocks the decoder actually reads.
  *
- * Deliberately narrow: images and text. PDF needs a seekable file descriptor
- * and page-by-page bitmap management, which is a different enough problem to be
- * its own change.
+ * Images and text are read straight from that URL. PDF needs a seekable file
+ * descriptor instead, so it goes through PdfPreview.
  */
-private enum class PreviewKind { Image, Text, None }
+private enum class PreviewKind { Image, Text, Pdf, None }
 
 private val imageExtensions =
     setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif")
@@ -64,6 +63,12 @@ private val textExtensions = setOf(
 private const val IMAGE_LIMIT_BYTES = 32L * 1024 * 1024
 private const val TEXT_LIMIT_BYTES = 512L * 1024
 
+/**
+ * PDF is read a page at a time rather than whole, so the cap is about how many
+ * range requests a document might cost, not about memory.
+ */
+private const val PDF_LIMIT_BYTES = 128L * 1024 * 1024
+
 /** Read at most this much of a text file; enough to see what it is. */
 private const val TEXT_READ_BYTES = 64 * 1024
 
@@ -73,6 +78,7 @@ private fun EntryInfo.previewKind(): PreviewKind {
     return when {
         extension in imageExtensions -> PreviewKind.Image
         extension in textExtensions -> PreviewKind.Text
+        extension == "pdf" -> PreviewKind.Pdf
         else -> PreviewKind.None
     }
 }
@@ -82,9 +88,19 @@ fun FilePreview(folderId: String, entry: EntryInfo, modifier: Modifier = Modifie
     val kind = remember(entry.path) { entry.previewKind() }
     if (kind == PreviewKind.None) return
 
-    val limit = if (kind == PreviewKind.Image) IMAGE_LIMIT_BYTES else TEXT_LIMIT_BYTES
+    val limit = when (kind) {
+        PreviewKind.Image -> IMAGE_LIMIT_BYTES
+        PreviewKind.Text -> TEXT_LIMIT_BYTES
+        PreviewKind.Pdf -> PDF_LIMIT_BYTES
+        PreviewKind.None -> 0L
+    }
     if (entry.size > limit) {
         PreviewNote("Too large to preview here — use Open instead.", modifier)
+        return
+    }
+
+    if (kind == PreviewKind.Pdf) {
+        PdfPreviewBlock(folderId, entry, modifier)
         return
     }
 
