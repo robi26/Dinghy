@@ -16,6 +16,26 @@ data class FolderInfo(
 )
 
 /**
+ * A configured peer, as shown in the device list.
+ *
+ * [name] is what the other device calls itself, which Syncthing only learns
+ * once the two have connected; before that it is empty and the id stands in.
+ */
+data class DeviceInfo(
+    val deviceId: String,
+    val name: String,
+    val isConnected: Boolean,
+    val isPaused: Boolean,
+    val addresses: List<String>,
+    /** Epoch millis, or null if the two have never connected. */
+    val lastSeen: Long?,
+) {
+    /** Never blank: an unnamed peer is shown by the leading block of its id. */
+    val displayName: String
+        get() = name.ifBlank { deviceId.substringBefore('-') }
+}
+
+/**
  * One entry in the *global* index. It exists whether or not its content has
  * been downloaded, which is what makes browsing-without-syncing possible.
  */

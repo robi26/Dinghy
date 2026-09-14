@@ -1,8 +1,8 @@
 package ch.steigis.dinghy.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,12 +22,228 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ch.steigis.dinghy.R
+import ch.steigis.dinghy.engine.DeviceInfo
+import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.FolderInfo
 import ch.steigis.dinghy.engine.SyncEngine
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal fun formatBytes(bytes: Long): String {
+/**
+ * The folder list, built from the same parts as the device list.
+ *
+ * A row per folder and nothing else. The add-folder form used to sit open at
+ * the bottom of the same card, and every folder carried a stack of "share with
+ * ABCDEFG" checkboxes underneath it, so the list of folders was the smallest
+ * part of the folder list.
+ *
+ * Tapping a folder still browses it. That is the app's primary action and does
+ * not deserve an extra tap, so a folder's settings live behind the browser's
+ * app bar rather than behind this row.
+ */
+@Composable
+fun FoldersScreen(
+    contentPadding: PaddingValues,
+    onOpenFolder: (FolderInfo) -> Unit,
+    onAddFolder: () -> Unit,
+) {
+    val state by SyncEngine.state.collectAsStateWithLifecycle()
+    val running = state is EngineState.Running
+    var folders by remember { mutableStateOf<List<FolderInfo>>(emptyList()) }
+
+    LaunchedEffect(state) {
+        while (true) {
+            folders = if (running) SyncEngine.folders() else emptyList()
+            delay(PEER_REFRESH_MILLIS)
+        }
+    }
+
+    TabColumn(contentPadding) {
+        SectionLabel(stringResource(R.string.label_synced_folders))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            if (folders.isEmpty()) {
+                EmptyNote(stringResource(R.string.folders_empty))
+            } else {
+                folders.forEachIndexed { index, folder ->
+                    if (index > 0) HorizontalDivider()
+                    NavigationRow(
+                        iconRes = R.drawable.ic_folder,
+                        title = folder.label,
+                        subtitle = folder.summary(),
+                        onClick = { onOpenFolder(folder) },
+                    )
+                }
+            }
+        }
+
+        AddCard(
+            text = stringResource(R.string.action_add_folder),
+            enabled = running,
+            onClick = onAddFolder,
+        )
+    }
+}
+
+/** The one line under a folder's name: how it syncs, and how little it stores. */
+@Composable
+private fun FolderInfo.summary(): String = buildString {
+    append(
+        if (isSelective) {
+            stringResource(R.string.folder_on_demand)
+        } else {
+            stringResource(R.string.folder_full_sync)
+        },
+    )
+    if (isPaused) append(" · ${stringResource(R.string.folder_paused)}")
+    append(
+        " · " + pluralStringResource(
+            R.plurals.folder_files,
+            // Counts this large are not real, but the cast has to be total.
+            globalFiles.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            globalFiles,
+        ),
+    )
+    // The point of the app: stored is normally a small fraction of visible.
+    append(" · ${formatBytes(localBytes)} of ${formatBytes(globalBytes)}")
+}
+
+/** Adding a folder, on a screen of its own rather than under the list. */
+@Composable
+fun AddFolderScreen(contentPadding: PaddingValues, onAdded: () -> Unit) {
+    var folderId by remember { mutableStateOf("") }
+    var onDemand by remember { mutableStateOf(true) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    TabColumn(contentPadding) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = folderId,
+                    onValueChange = { folderId = it; message = null },
+                    label = { Text(stringResource(R.string.hint_folder_id)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.hint_folder_id_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = onDemand, onCheckedChange = { onDemand = it })
+                    Column {
+                        Text(
+                            stringResource(R.string.folder_on_demand_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            stringResource(R.string.folder_on_demand_help),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Button(
+                    enabled = folderId.isNotBlank(),
+                    onClick = {
+                        val id = folderId.trim()
+                        scope.launch {
+                            message = try {
+                                SyncEngine.addFolder(id, onDemand)
+                                folderId = ""
+                                // Back to the list the folder is now in.
+                                onAdded()
+                                null
+                            } catch (t: Throwable) {
+                                t.message ?: t.javaClass.simpleName
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.action_add_folder_button)) }
+            }
+        }
+    }
+}
+
+/**
+ * One folder's settings. Sharing is the load-bearing part: a folder shared with
+ * nobody will never receive an index, so it is not optional polish.
+ */
+@Composable
+fun FolderSettingsScreen(folderId: String, contentPadding: PaddingValues) {
+    var devices by remember(folderId) { mutableStateOf<List<DeviceInfo>>(emptyList()) }
+    var shares by remember(folderId) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    var reload by remember(folderId) { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(folderId, reload) {
+        while (true) {
+            devices = SyncEngine.devices()
+            shares = SyncEngine.folderShares(folderId).toMap()
+            delay(PEER_REFRESH_MILLIS)
+        }
+    }
+
+    TabColumn(contentPadding) {
+        SectionLabel(stringResource(R.string.label_shared_with))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            if (devices.isEmpty()) {
+                EmptyNote(stringResource(R.string.shares_no_devices))
+            } else {
+                devices.forEachIndexed { index, device ->
+                    if (index > 0) HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = shares[device.deviceId] == true,
+                            onCheckedChange = { want ->
+                                scope.launch {
+                                    runCatching {
+                                        SyncEngine.shareFolder(folderId, device.deviceId, want)
+                                    }
+                                    reload++
+                                }
+                            },
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            // The device's name, not seven characters of its id:
+                            // the device list already knows what it is called.
+                            Text(
+                                device.displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                if (device.isConnected) {
+                                    stringResource(R.string.device_connected)
+                                } else {
+                                    stringResource(R.string.device_not_connected)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
     val units = listOf("KB", "MB", "GB", "TB")
     var value = bytes.toDouble() / 1024
@@ -37,147 +253,4 @@ internal fun formatBytes(bytes: Long): String {
         unit++
     }
     return String.format("%.1f %s", value, units[unit])
-}
-
-/** Folder list plus the add-folder form. */
-@Composable
-fun FoldersSection(enabled: Boolean, onOpenFolder: (FolderInfo) -> Unit) {
-    var folders by remember { mutableStateOf<List<FolderInfo>>(emptyList()) }
-    var reloadToken by remember { mutableStateOf(0) }
-
-    LaunchedEffect(enabled, reloadToken) {
-        folders = if (enabled) SyncEngine.folders() else emptyList()
-    }
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        // No "Folders" heading here: the tab this sits on is already called
-        // Folders, and the app bar says so.
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            if (folders.isEmpty()) {
-                Text(
-                    "No folders yet. Add one with the same ID as on your other device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-            } else {
-                folders.forEach { folder ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenFolder(folder) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(folder.label, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                buildString {
-                                    append(if (folder.isSelective) "on-demand" else "full sync")
-                                    if (folder.isPaused) append(" · paused")
-                                    append(" · ${folder.globalFiles} files")
-                                    // The point of the app: stored is normally a
-                                    // small fraction of what is visible.
-                                    append(
-                                        " · ${formatBytes(folder.localBytes)} of " +
-                                            formatBytes(folder.globalBytes),
-                                    )
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    FolderShares(folder.id)
-                    HorizontalDivider()
-                }
-            }
-
-            AddFolderForm(enabled = enabled, onAdded = { reloadToken++ })
-        }
-    }
-}
-
-/**
- * Which peers a folder is shared with. A folder that exists only locally will
- * never receive an index, so this is not optional polish.
- */
-@Composable
-private fun FolderShares(folderId: String) {
-    var shares by remember(folderId) { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) }
-    var reload by remember(folderId) { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(folderId, reload) { shares = SyncEngine.folderShares(folderId) }
-
-    shares.forEach { (deviceId, shared) ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = shared,
-                onCheckedChange = { want ->
-                    scope.launch {
-                        runCatching { SyncEngine.shareFolder(folderId, deviceId, want) }
-                        reload++
-                    }
-                },
-            )
-            Text(
-                "share with ${deviceId.take(7)}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AddFolderForm(enabled: Boolean, onAdded: () -> Unit) {
-    var folderId by remember { mutableStateOf("") }
-    var onDemand by remember { mutableStateOf(true) }
-    var message by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = folderId,
-            onValueChange = { folderId = it; message = null },
-            label = { Text("Folder ID") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = onDemand, onCheckedChange = { onDemand = it })
-            Column {
-                Text("On-demand", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "Receive the file list without downloading anything",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        Button(
-            enabled = enabled && folderId.isNotBlank(),
-            onClick = {
-                val id = folderId.trim()
-                scope.launch {
-                    message = try {
-                        SyncEngine.addFolder(id, onDemand)
-                        folderId = ""
-                        onAdded()
-                        "Added $id"
-                    } catch (t: Throwable) {
-                        t.message ?: t.javaClass.simpleName
-                    }
-                }
-            },
-        ) { Text("Add folder") }
-    }
 }

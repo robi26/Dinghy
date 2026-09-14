@@ -29,7 +29,7 @@
     <string name="action_start">Start syncing</string>
     <string name="action_copy">Copy</string>
 
-    <string name="label_device_id">This device</string>
+    <string name="label_device_id">Device ID</string>
     <string name="label_folders">Folders</string>
     <string name="label_engine">Engine</string>
     <string name="label_add_device">Add device</string>
@@ -41,6 +41,41 @@
     <string name="tab_folders">Folders</string>
     <string name="tab_search">Search</string>
     <string name="tab_settings">Settings</string>
+
+    <string name="label_this_device">This device</string>
+    <string name="label_associated_devices">Associated devices</string>
+    <string name="label_listening_on">Listening on</string>
+    <string name="label_addresses">Addresses</string>
+    <string name="devices_empty">No devices yet. Add one to start syncing.</string>
+    <string name="device_connected">Connected</string>
+    <string name="device_not_connected">Not connected</string>
+    <string name="device_paused">Paused</string>
+    <string name="device_last_seen">Last seen %1$s</string>
+    <string name="device_last_seen_never">Never connected</string>
+    <string name="action_add_device">Add device\u2026</string>
+    <string name="action_remove_device">Remove device</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="remove_device_title">Remove this device?</string>
+    <string name="label_synced_folders">Synced folders</string>
+    <string name="label_shared_with">Shared with</string>
+    <string name="folders_empty">No folders yet. Add one with the same ID as on your other device.</string>
+    <string name="shares_no_devices">No devices yet. Add one on the Devices tab first.</string>
+    <string name="folder_on_demand">on-demand</string>
+    <string name="folder_full_sync">full sync</string>
+    <string name="folder_paused">paused</string>
+    <plurals name="folder_files">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <string name="hint_folder_id">Folder ID</string>
+    <string name="hint_folder_id_help">Must match the folder ID on your other device.</string>
+    <string name="folder_on_demand_title">On-demand</string>
+    <string name="folder_on_demand_help">Receive the file list without downloading anything</string>
+    <string name="action_add_folder">Add folder\u2026</string>
+    <string name="action_add_folder_button">Add folder</string>
+    <string name="label_folder_settings">Folder settings</string>
+    <string name="remove_device_body">Dinghy will stop syncing with it. Shared folders stay, without this device in them.</string>
     <string name="action_back">Back</string>
     <string name="cd_folder">Folder</string>
     <string name="cd_file">File</string>
