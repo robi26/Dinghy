@@ -73,9 +73,10 @@ drives `gomobile` itself (`gomobileTools` → `gomobileBind` → `preBuild`).
 ## Installing
 
 APKs are published on the [releases page](../../releases), one per ABI —
-`arm64-v8a` for essentially every current phone, `armeabi-v7a` for older 32-bit
-devices, `x86_64` for emulators. There is no universal APK: the compiled Go
-engine is ~25 MiB per ABI.
+`arm64-v8a` for essentially every current phone, `x86_64` for emulators. There
+is no universal APK: the compiled Go engine is ~25 MiB per ABI. 32-bit ARM
+(`armeabi-v7a`) was dropped after 0.1.1; those devices predate the arm64
+requirement Android has placed on new hardware since 2021.
 
 To get updates automatically, add the repository to
 [Obtainium](https://github.com/ImranR98/Obtainium). Each release also carries a
@@ -117,8 +118,10 @@ enough to check that R8 is happy.
 
 **Version codes.** `splits.abi` does nothing on AGP 9, so per-ABI APKs come from
 separate builds and each needs its own increasing version code. The code is
-`baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (armeabi-v7a 1,
-arm64-v8a 3, x86_64 4) — so `baseVersionCode = 2` publishes as 21, 23 and 24.
+`baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (arm64-v8a 3,
+x86_64 4) — so `baseVersionCode = 2` publishes as 23 and 24. Retired ABIs keep
+their ordinal rather than freeing it: armeabi-v7a held 1 and shipped as 11
+and 21, so 1 can never mean anything else.
 The ordinals must never be reordered once released. Unlike the version name,
 `baseVersionCode` is not derived from the tag: bump it in `app/build.gradle.kts`
 before tagging, or Android and Obtainium will not see the release as an update.
