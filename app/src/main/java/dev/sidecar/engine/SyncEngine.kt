@@ -132,6 +132,108 @@ object SyncEngine {
         running.peers().toList().filter { it != ownId }
     }
 
+    // ---- folders -------------------------------------------------------
+
+    suspend fun folders(): List<FolderInfo> = withContext(engineDispatcher) {
+        val running = client ?: return@withContext emptyList()
+        running.folders().toList().mapNotNull { id ->
+            val folder = running.folderWithID(id) ?: return@mapNotNull null
+            FolderInfo(
+                id = id,
+                label = folder.label().ifEmpty { id },
+                path = folder.path(),
+                isSelective = folder.isSelective,
+                isPaused = folder.isPaused,
+                connectedPeers = folder.connectedPeerCount().toInt(),
+            )
+        }
+    }
+
+    /**
+     * Adds a folder. [onDemand] creates it selective -- ignores are set to "*",
+     * so the index arrives but no content does until something is pinned.
+     */
+    suspend fun addFolder(folderId: String, onDemand: Boolean) = withContext(engineDispatcher) {
+        val running = client ?: error("engine is not running")
+        running.addFolder(folderId, "", onDemand, false)
+        refreshState()
+    }
+
+    /** Peers, paired with whether this folder is shared with each. */
+    suspend fun folderShares(folderId: String): List<Pair<String, Boolean>> =
+        withContext(engineDispatcher) {
+            val running = client ?: return@withContext emptyList()
+            val folder = running.folderWithID(folderId) ?: return@withContext emptyList()
+            val ownId = running.deviceID()
+            running.peers().toList()
+                .filter { it != ownId }
+                .map { it to folder.isSharedWithDeviceID(it) }
+        }
+
+    suspend fun shareFolder(folderId: String, deviceId: String, share: Boolean) =
+        withContext(engineDispatcher) {
+            val running = client ?: error("engine is not running")
+            running.folderWithID(folderId)?.shareWithDevice(deviceId, share, "")
+        }
+
+    // ---- browsing ------------------------------------------------------
+
+    /**
+     * Lists one directory level from the global index. [prefix] is "" for the
+     * folder root and otherwise ends in "/".
+     */
+    suspend fun browse(folderId: String, prefix: String): List<EntryInfo> =
+        withContext(engineDispatcher) {
+            val running = client ?: return@withContext emptyList()
+            val folder = running.folderWithID(folderId) ?: return@withContext emptyList()
+
+            // The second argument is Syncthing's `returnOnlyDirectories`, not
+            // "include directories": passing true hides every file.
+            folder.list(prefix, false, false).toList()
+                .mapNotNull { name -> entryInfo(folder, prefix + name, name) }
+                .sortedWith(compareByDescending<EntryInfo> { it.isDirectory }.thenBy { it.name.lowercase() })
+        }
+
+    /**
+     * Pins or unpins an entry. Pinning writes a "!/path" exception ahead of the
+     * catch-all "*" in .stignore, which is what makes the content arrive.
+     */
+    suspend fun setSelected(folderId: String, path: String, selected: Boolean) =
+        withContext(engineDispatcher) {
+            val running = client ?: error("engine is not running")
+            val folder = running.folderWithID(folderId) ?: error("no such folder")
+            val entry = folder.getFileInformation(path) ?: error("no such entry")
+            entry.setExplicitlySelected(selected)
+        }
+
+    suspend fun entry(folderId: String, path: String): EntryInfo? =
+        withContext(engineDispatcher) {
+            val running = client ?: return@withContext null
+            val folder = running.folderWithID(folderId) ?: return@withContext null
+            entryInfo(folder, path, path.trimEnd('/').substringAfterLast('/'))
+        }
+
+    private fun entryInfo(
+        folder: dev.sidecar.binding.sushitrain.Folder,
+        path: String,
+        name: String,
+    ): EntryInfo? = try {
+        folder.getFileInformation(path.trimEnd('/'))?.let { e ->
+            EntryInfo(
+                name = name.trimEnd('/'),
+                path = e.path(),
+                isDirectory = e.isDirectory,
+                size = e.size(),
+                isLocallyPresent = e.isLocallyPresent,
+                isExplicitlySelected = e.isExplicitlySelected,
+                isSelected = e.isSelected,
+            )
+        }
+    } catch (t: Throwable) {
+        Log.w(TAG, "could not read entry $path", t)
+        null
+    }
+
     /** Recomputes the observable state from the engine. Cheap; safe to call often. */
     suspend fun refresh() = withContext(engineDispatcher) { refreshState() }
 

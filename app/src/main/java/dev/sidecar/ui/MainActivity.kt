@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,15 +65,55 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    StatusScreen()
+                    SidecarApp()
                 }
             }
         }
     }
 }
 
+/** Where the user is. Small enough that a navigation library would be overhead. */
+private sealed interface Screen {
+    data object Status : Screen
+    data class Browse(val folderId: String, val label: String, val prefix: String) : Screen
+}
+
 @Composable
-private fun StatusScreen() {
+private fun SidecarApp() {
+    var stack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Status)) }
+    val current = stack.last()
+
+    BackHandler(enabled = stack.size > 1) { stack = stack.dropLast(1) }
+
+    when (current) {
+        is Screen.Status -> StatusScreen(
+            onOpenFolder = { folder ->
+                stack = stack + Screen.Browse(folder.id, folder.label, "")
+            },
+        )
+
+        is Screen.Browse -> Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(current.label, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "/" + current.prefix.trimEnd('/'),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            BrowserScreen(
+                folderId = current.folderId,
+                prefix = current.prefix,
+                onOpenDirectory = { childPrefix ->
+                    stack = stack + Screen.Browse(current.folderId, current.label, childPrefix)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusScreen(onOpenFolder: (dev.sidecar.engine.FolderInfo) -> Unit) {
     val context = LocalContext.current
     val state by SyncEngine.state.collectAsStateWithLifecycle()
 
@@ -128,6 +169,11 @@ private fun StatusScreen() {
                 }
             }
         }
+
+        FoldersSection(
+            enabled = state is EngineState.Running,
+            onOpenFolder = onOpenFolder,
+        )
 
         AddDeviceCard(enabled = state is EngineState.Running)
 
