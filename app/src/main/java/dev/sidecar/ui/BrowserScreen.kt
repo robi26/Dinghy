@@ -46,7 +46,16 @@ fun BrowserScreen(
     var entries by remember(folderId, prefix) { mutableStateOf<List<EntryInfo>?>(null) }
     var error by remember(folderId, prefix) { mutableStateOf<String?>(null) }
     var reloadToken by remember { mutableStateOf(0) }
+    var sheetFor by remember { mutableStateOf<EntryInfo?>(null) }
     val scope = rememberCoroutineScope()
+
+    sheetFor?.let { selected ->
+        FileSheet(
+            folderId = folderId,
+            entry = selected,
+            onDismiss = { sheetFor = null; reloadToken++ },
+        )
+    }
 
     LaunchedEffect(folderId, prefix, reloadToken) {
         error = null
@@ -92,7 +101,13 @@ fun BrowserScreen(
             items(current, key = { it.path }) { entry ->
                 EntryRow(
                     entry = entry,
-                    onOpen = { onOpenDirectory(entry.path.trimEnd('/') + "/") },
+                    onOpen = {
+                        if (entry.isDirectory) {
+                            onOpenDirectory(entry.path.trimEnd('/') + "/")
+                        } else {
+                            sheetFor = entry
+                        }
+                    },
                     onToggle = { selected ->
                         scope.launch {
                             runCatching { SyncEngine.setSelected(folderId, entry.path, selected) }
@@ -112,7 +127,7 @@ private fun EntryRow(entry: EntryInfo, onOpen: () -> Unit, onToggle: (Boolean) -
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (entry.isDirectory) Modifier.clickable(onClick = onOpen) else Modifier)
+            .clickable(onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

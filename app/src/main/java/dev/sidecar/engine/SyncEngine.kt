@@ -5,11 +5,14 @@ import android.util.Log
 import dev.sidecar.binding.sushitrain.Change
 import dev.sidecar.binding.sushitrain.Client
 import dev.sidecar.binding.sushitrain.ClientDelegate
+import dev.sidecar.binding.sushitrain.DownloadDelegate
 import dev.sidecar.binding.sushitrain.ListOfStrings
 import dev.sidecar.binding.sushitrain.Sushitrain
 import java.io.File
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -85,6 +88,9 @@ object SyncEngine {
 
             _state.value = EngineState.Starting
             created.start()
+            // start() constructs the streaming server but does not bind it;
+            // without this, every on-demand URL points at a closed port.
+            created.server?.listen()
             client = created
             Log.i(TAG, "engine started as ${created.shortDeviceID()}")
             refreshState()
@@ -232,6 +238,57 @@ object SyncEngine {
     } catch (t: Throwable) {
         Log.w(TAG, "could not read entry $path", t)
         null
+    }
+
+    // ---- on-demand access ----------------------------------------------
+
+    /**
+     * A signed localhost URL serving this entry, fetching blocks from peers as
+     * they are read. Range requests work against files that were never
+     * downloaded, which is what makes streaming and previewing possible.
+     */
+    suspend fun onDemandUrl(folderId: String, path: String): String? =
+        withContext(engineDispatcher) {
+            val running = client ?: return@withContext null
+            val folder = running.folderWithID(folderId) ?: return@withContext null
+            folder.getFileInformation(path)?.onDemandURL()
+        }
+
+    /**
+     * Downloads one entry to [destination], reporting progress as a fraction.
+     * Unlike pinning, this does not change the folder's selection -- it is a
+     * one-off copy, for "save to my device" rather than "keep this in sync".
+     */
+    suspend fun download(
+        folderId: String,
+        path: String,
+        destination: File,
+        onProgress: (Double) -> Unit,
+    ): String = withContext(engineDispatcher) {
+        val running = client ?: error("engine is not running")
+        val folder = running.folderWithID(folderId) ?: error("no such folder")
+        val entry = folder.getFileInformation(path) ?: error("no such entry")
+
+        // isCancelled() is called from Go on a non-coroutine thread, so the
+        // caller's Job is captured here rather than looked up inside it.
+        val callerJob = coroutineContext[Job]
+        val result = CompletableDeferred<String>()
+        entry.download(
+            destination.absolutePath,
+            object : DownloadDelegate {
+                override fun onProgress(fraction: Double) = onProgress(fraction)
+                override fun onFinished(path: String?) {
+                    result.complete(path.orEmpty())
+                }
+
+                override fun onError(error: String?) {
+                    result.completeExceptionally(RuntimeException(error ?: "download failed"))
+                }
+
+                override fun isCancelled(): Boolean = callerJob?.isActive == false
+            },
+        )
+        result.await()
     }
 
     /** Recomputes the observable state from the engine. Cheap; safe to call often. */
