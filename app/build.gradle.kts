@@ -56,7 +56,7 @@ val sushitrainSrcDir =
  * does nothing on AGP 9, so per-ABI APKs come from separate builds and each
  * needs a distinct, increasing code for update checks to work.
  */
-val baseVersionCode = 2
+val baseVersionCode = 3
 
 /**
  * Version name. CI exports VERSION_NAME from the git tag (minus its `v`) so a

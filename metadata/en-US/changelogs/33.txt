@@ -1,0 +1,11 @@
+A new icon, a navigation bar, and file previews.
+
+* Dinghy has an icon of its own, including a themed one
+* Devices, Folders, Search and Settings are separate tabs
+* Search now covers every folder at once, and results open
+* Preview images, text and PDFs without downloading them
+* Follows the system dark theme
+* Nothing hides behind the status bar or the gesture handle any more
+* Folder browsing shows where you are and how to get back
+
+32-bit ARM (armeabi-v7a) is no longer published.
