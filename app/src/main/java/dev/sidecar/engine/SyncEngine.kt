@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -238,6 +241,25 @@ object SyncEngine {
     } catch (t: Throwable) {
         Log.w(TAG, "could not read entry $path", t)
         null
+    }
+
+    /**
+     * Starts the engine and waits until it is usable, for callers that cannot
+     * suspend and have nothing to show until it is -- notably the
+     * DocumentsProvider, which the system may invoke in a cold process.
+     */
+    fun ensureStartedBlocking(context: Context, timeoutMillis: Long = 20_000): Boolean =
+        runBlocking {
+            if (isRunning) return@runBlocking true
+            withTimeoutOrNull(timeoutMillis) {
+                start(context)
+                state.first { it is EngineState.Running || it is EngineState.Failed }
+            } is EngineState.Running
+        }
+
+    /** Absolute on-device path of a folder's root. */
+    suspend fun folderPath(folderId: String): String? = withContext(engineDispatcher) {
+        client?.folderWithID(folderId)?.path()
     }
 
     // ---- on-demand access ----------------------------------------------
