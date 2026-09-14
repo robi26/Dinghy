@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,10 +28,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.steigis.dinghy.R
+import androidx.compose.runtime.rememberCoroutineScope
 import ch.steigis.dinghy.engine.DeviceInfo
+import ch.steigis.dinghy.engine.DiscoveredDevice
 import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.SyncEngine
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The device list.
@@ -51,6 +55,9 @@ fun DevicesScreen(
     val state by SyncEngine.state.collectAsStateWithLifecycle()
     val running = state as? EngineState.Running
     var devices by remember { mutableStateOf<List<DeviceInfo>>(emptyList()) }
+    var discovered by remember { mutableStateOf<List<DiscoveredDevice>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     // Keyed on the engine state so a connect or drop shows immediately, and
     // repeating because the state flow alone does not carry everything a row
@@ -58,6 +65,7 @@ fun DevicesScreen(
     LaunchedEffect(state) {
         while (true) {
             devices = if (running != null) SyncEngine.devices() else emptyList()
+            discovered = if (running != null) SyncEngine.discoveredDevices() else emptyList()
             delay(PEER_REFRESH_MILLIS)
         }
     }
@@ -105,6 +113,48 @@ fun DevicesScreen(
                     )
                 }
             }
+        }
+
+        // Only when there is something to show: an empty "Found nearby" is a
+        // standing question about whether discovery is broken.
+        if (discovered.isNotEmpty()) {
+            SectionLabel(stringResource(R.string.label_discovered_devices))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                discovered.forEachIndexed { index, device ->
+                    if (index > 0) HorizontalDivider()
+                    NavigationRow(
+                        iconRes = R.drawable.ic_devices,
+                        title = device.displayName,
+                        subtitle = device.addresses.firstOrNull()
+                            ?: stringResource(R.string.device_not_connected),
+                        // The row itself does nothing: adding a device is a
+                        // deliberate act, so it lives on the button.
+                        onClick = {},
+                        trailing = {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        SyncEngine.addPeer(device.deviceId, device.addresses)
+                                    }.onFailure {
+                                        error = it.message ?: it.javaClass.simpleName
+                                    }
+                                    devices = SyncEngine.devices()
+                                    discovered = SyncEngine.discoveredDevices()
+                                }
+                            }) { Text(stringResource(R.string.action_link_device)) }
+                        },
+                    )
+                }
+                EmptyNote(stringResource(R.string.discovered_hint))
+            }
+        }
+
+        error?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
 
         AddCard(

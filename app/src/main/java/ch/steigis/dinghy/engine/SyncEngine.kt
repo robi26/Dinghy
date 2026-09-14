@@ -56,6 +56,15 @@ object SyncEngine {
     private val _state = MutableStateFlow<EngineState>(EngineState.Stopped)
     val state: StateFlow<EngineState> = _state.asStateFlow()
 
+    /**
+     * Devices seen announcing themselves on the local network, by id.
+     *
+     * Everything ever discovered, including peers already configured; the UI
+     * filters rather than this, because a peer that is removed should reappear
+     * here without waiting for the next announcement.
+     */
+    private val _discovered = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+
     /** Change events from the engine; replay lets a late subscriber see recent activity. */
     private val _changes = MutableSharedFlow<FileChange>(replay = 16, extraBufferCapacity = 64)
     val changes: SharedFlow<FileChange> = _changes.asSharedFlow()
@@ -158,6 +167,21 @@ object SyncEngine {
             .mapNotNull { id -> running.peerWithID(id)?.let { describe(it, id) } }
             .sortedWith(compareByDescending<DeviceInfo> { it.isConnected }
                 .thenBy { it.displayName.lowercase() })
+    }
+
+    /**
+     * Discovered devices that are not already configured, and are not this
+     * device. Read on demand rather than kept as a flow, because "already
+     * configured" changes when a peer is added or removed and the announcement
+     * that put it here will not repeat just to say so.
+     */
+    suspend fun discoveredDevices(): List<DiscoveredDevice> = withContext(engineDispatcher) {
+        val running = client ?: return@withContext emptyList()
+        val known = running.peers().toList().toSet() + running.deviceID()
+        _discovered.value
+            .filterKeys { it !in known }
+            .map { (id, addresses) -> DiscoveredDevice(id, addresses) }
+            .sortedBy { it.deviceId }
     }
 
     suspend fun device(deviceId: String): DeviceInfo? = withContext(engineDispatcher) {
@@ -486,7 +510,11 @@ object SyncEngine {
         }
 
         override fun onDeviceDiscovered(deviceID: String?, addresses: ListOfStrings?) {
-            Log.i(TAG, "discovered device $deviceID")
+            val id = deviceID ?: return
+            Log.i(TAG, "discovered device $id")
+            // Announcements repeat, so this replaces rather than accumulates:
+            // the newest addresses are the ones worth dialling.
+            _discovered.value = _discovered.value + (id to addresses.toList())
         }
 
         override fun onListenAddressesChanged(addresses: ListOfStrings?) {

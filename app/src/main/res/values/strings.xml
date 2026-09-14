@@ -44,6 +44,9 @@
 
     <string name="label_this_device">This device</string>
     <string name="label_associated_devices">Associated devices</string>
+    <string name="label_discovered_devices">Found nearby</string>
+    <string name="discovered_hint">Announcing themselves on this network. Check the ID matches before adding.</string>
+    <string name="action_link_device">Add</string>
     <string name="label_listening_on">Listening on</string>
     <string name="label_addresses">Addresses</string>
     <string name="devices_empty">No devices yet. Add one to start syncing.</string>

@@ -16,6 +16,19 @@ data class FolderInfo(
 )
 
 /**
+ * A device that announced itself on the local network but is not configured as
+ * a peer. Discovery is the whole reason for the multicast lock: without it,
+ * pairing means typing a 63-character id by hand.
+ */
+data class DiscoveredDevice(
+    val deviceId: String,
+    val addresses: List<String>,
+) {
+    /** Discovery carries no name, so the leading block of the id stands in. */
+    val displayName: String get() = deviceId.substringBefore('-')
+}
+
+/**
  * A configured peer, as shown in the device list.
  *
  * [name] is what the other device calls itself, which Syncthing only learns
