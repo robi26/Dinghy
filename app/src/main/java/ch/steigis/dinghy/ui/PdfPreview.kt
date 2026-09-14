@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -244,11 +245,10 @@ internal fun PdfPreview(folderId: String, entry: EntryInfo, modifier: Modifier =
 
         val rendered = bitmap
         if (rendered == null) {
-            Text(
-                "Rendering…",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Same spinner as the image and text previews. Opening a PDF seeks
+            // to its cross-reference table at EOF first, so this is visible for
+            // a moment even before the first page is decoded.
+            CircularProgressIndicator()
         } else {
             Image(
                 bitmap = rendered.asImageBitmap(),

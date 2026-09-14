@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import ch.steigis.dinghy.engine.EntryInfo
 import ch.steigis.dinghy.engine.SyncEngine
-import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -115,13 +115,30 @@ fun FilePreview(folderId: String, entry: EntryInfo, modifier: Modifier = Modifie
     when {
         failed -> PreviewNote("No preview — the file could not be reached.", modifier)
         url == null -> PreviewBox(modifier) { CircularProgressIndicator() }
-        kind == PreviewKind.Image -> AsyncImage(
+        // Subcompose rather than AsyncImage so the fetch has visible states.
+        // Resolving the URL is instant; what takes time is the image itself,
+        // which for a file that is not on the device means pulling blocks from
+        // a peer -- so a plain AsyncImage leaves an empty box for exactly as
+        // long as the interesting part takes.
+        kind == PreviewKind.Image -> SubcomposeAsyncImage(
             model = url,
             contentDescription = entry.name,
             contentScale = ContentScale.Fit,
+            loading = { CircularProgressIndicator(modifier = Modifier.align(Alignment.Center)) },
+            error = {
+                Text(
+                    "No preview — this image could not be decoded.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center).padding(12.dp),
+                )
+            },
             modifier = modifier
                 .fillMaxWidth()
-                .heightIn(max = 260.dp)
+                // A minimum as well as a maximum: without it the box is zero
+                // height while loading, so the spinner has nowhere to sit and
+                // the sheet jumps when the image arrives.
+                .heightIn(min = 120.dp, max = 260.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         )
