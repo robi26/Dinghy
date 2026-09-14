@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -44,13 +46,21 @@ import kotlinx.coroutines.launch
 fun FileSheet(folderId: String, entry: EntryInfo, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
+    // Opens fully rather than half height: with a preview above them, Open and
+    // Download a copy sit below the fold on a short screen, and nothing tells
+    // you the sheet can be dragged.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var progress by remember { mutableStateOf<Double?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            // Scrollable for the same reason: a tall preview on a small screen
+            // must not be able to push the actions out of reach.
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(entry.name, style = MaterialTheme.typography.titleLarge)
@@ -59,6 +69,11 @@ fun FileSheet(folderId: String, entry: EntryInfo, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            // Above the actions on purpose: the question a preview answers is
+            // whether this is the file you meant, which you want settled before
+            // choosing Open or Download.
+            FilePreview(folderId = folderId, entry = entry)
 
             progress?.let { LinearProgressIndicator(progress = { it.toFloat() }, modifier = Modifier.fillMaxWidth()) }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
