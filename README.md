@@ -62,6 +62,56 @@ drives `gomobile` itself (`gomobileTools` → `gomobileBind` → `preBuild`).
 - R8 needs a keep rule for classes implementing the binding's callback interfaces:
   Go calls them through JNI, so R8 sees no reference. See `app/proguard-rules.pro`.
 
+## Installing
+
+APKs are published on the [releases page](../../releases), one per ABI —
+`arm64-v8a` for essentially every current phone, `armeabi-v7a` for older 32-bit
+devices, `x86_64` for emulators. There is no universal APK: the compiled Go
+engine is ~25 MiB per ABI.
+
+To get updates automatically, add the repository to
+[Obtainium](https://github.com/ImranR98/Obtainium). Each release also carries a
+`latest-release.json` listing every APK with its SHA-256, and a `SHA256SUMS`
+file.
+
+### Verifying a download
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+apksigner verify --print-certs sidecar-<version>-<abi>.apk
+```
+
+The signing certificate's SHA-256 digest should match the one published with the
+first release. A different certificate means a different build — do not install
+it over an existing one, and Android will refuse anyway.
+
+## Releasing
+
+Releases are built by CI on a `v*` tag: each ABI is built and signed separately,
+the signature is verified in the job, and the APKs are attached to the GitHub
+release along with the Obtainium manifest and checksums.
+
+Signing credentials come from repository secrets:
+`SIDECAR_KEYSTORE_BASE64`, `SIDECAR_KEYSTORE_PASSWORD`, `SIDECAR_KEY_ALIAS` and
+`SIDECAR_KEY_PASSWORD`. Locally, put the same values in `keystore.properties`
+(gitignored); without it a release build still runs, just unsigned, which is
+enough to check that R8 is happy.
+
+```bash
+./gradlew :app:dist -Pabi=arm64-v8a    # signed APK into dist/
+```
+
+**Version codes.** `splits.abi` does nothing on AGP 9, so per-ABI APKs come from
+separate builds and each needs its own increasing version code. The code is
+`baseVersionCode * 10 + ordinal`, with ordinals fixed per ABI (armeabi-v7a 1,
+arm64-v8a 3, x86_64 4) — so 0.1.0 publishes as 11, 13 and 14. The ordinals must
+never be reordered once released.
+
+**Reproducible builds** are not claimed yet. The Go toolchain and gomobile make
+bit-identical output harder than for a pure-Kotlin app, and that has not been
+verified, so F-Droid's build pipeline is out of scope for now; the IzzyOnDroid
+repository accepts upstream-signed APKs and is the more realistic next step.
+
 ## Licensing
 
 Sidecar is **GPL-3.0**. SushitrainCore is **MPL-2.0** and stays under its own license;

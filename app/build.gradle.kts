@@ -1,4 +1,5 @@
 import org.gradle.internal.os.OperatingSystem
+import java.util.Properties
 import javax.inject.Inject
 
 plugins {
@@ -44,6 +45,22 @@ val goToolBinDir = toolchainsDir.dir("bin")
 val coreSrcDir = rootProject.layout.projectDirectory.dir("core")
 val sushitrainSrcDir =
     rootProject.layout.projectDirectory.dir("external/sushitrain/SushitrainCore/src")
+
+/**
+ * Base version code. Each ABI gets its own derived code because `splits.abi`
+ * does nothing on AGP 9, so per-ABI APKs come from separate builds and each
+ * needs a distinct, increasing code for update checks to work.
+ */
+val baseVersionCode = 1
+val versionNameValue = "0.1.0"
+
+/** Stable ordinal per ABI; must never be reordered once released. */
+fun abiOrdinal(abi: String): Int = when (abi) {
+    "armeabi-v7a" -> 1
+    "arm64-v8a" -> 3
+    "x86_64" -> 4
+    else -> error("no version code ordinal for $abi")
+}
 
 val minSdkVersion = 26
 val ndkVersionUsed = "30.0.16248370"
@@ -160,6 +177,22 @@ val gomobileBind = tasks.register("gomobileBind") {
     }
 }
 
+/**
+ * Release signing. Credentials come from keystore.properties (never committed)
+ * or, in CI, from the environment. An unsigned release build is still useful
+ * for checking that R8 is happy, so a missing keystore is not an error.
+ */
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingValue(property: String, environment: String): String? =
+    keystoreProperties.getProperty(property) ?: System.getenv(environment)
+
+val keystorePath = signingValue("storeFile", "SIDECAR_KEYSTORE_FILE")
+val hasSigningConfig = keystorePath != null && File(keystorePath).exists()
+
 android {
     namespace = "dev.sidecar"
     compileSdk = 36
@@ -171,8 +204,8 @@ android {
         // DocumentsProvider needs to serve files that are not downloaded yet.
         minSdk = minSdkVersion
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = baseVersionCode
+        versionName = versionNameValue
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -187,8 +220,28 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasSigningConfig) {
+            create("release") {
+                storeFile = File(keystorePath!!)
+                storePassword = signingValue("storePassword", "SIDECAR_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SIDECAR_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SIDECAR_KEY_PASSWORD")
+                // v1 is pointless at minSdk 26 and slows installs; v3 carries
+                // the rotation proof that lets the signing key be changed later
+                // without orphaning existing installs.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -208,7 +261,36 @@ android {
     }
 }
 
+// AGP 9 removed the legacy applicationVariants output API, so per-ABI version
+// codes are set through the Variant API instead.
+androidComponents {
+    onVariants { variant ->
+        val abi = selectedAbis.singleOrNull() ?: return@onVariants
+        variant.outputs.forEach { output ->
+            output.versionCode.set(baseVersionCode * 10 + abiOrdinal(abi))
+            output.versionName.set(versionNameValue)
+        }
+    }
+}
+
 tasks.named("preBuild") { dependsOn(gomobileBind) }
+
+/**
+ * Copies the built APK to dist/ under a name that identifies the ABI and
+ * version, which is what gets attached to a release.
+ */
+val dist = tasks.register<Copy>("dist") {
+    description = "Stages the release APK into dist/ with a release-ready name"
+    // Without this the copy can run before the APK exists and silently stage a
+    // stale one from a previous build.
+    dependsOn("assembleRelease")
+    val abi = selectedAbis.singleOrNull() ?: "universal"
+    from(layout.buildDirectory.dir("outputs/apk/release")) {
+        include("*.apk")
+        rename { "sidecar-$versionNameValue-$abi.apk" }
+    }
+    into(rootProject.layout.projectDirectory.dir("dist"))
+}
 
 dependencies {
     implementation(files(gomobileAar))

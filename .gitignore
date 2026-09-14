@@ -11,3 +11,11 @@ local.properties
 
 # Go
 /core/build/
+
+# Release signing (never commit)
+keystore.properties
+*.jks
+*.keystore
+
+# Staged release artifacts
+/dist/

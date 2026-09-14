@@ -1,0 +1,7 @@
+First release.
+
+* Browse the global index without downloading files
+* Pin files and folders to sync them on demand
+* Stream files that are not on the device
+* Synced folders in the system file picker, with search
+* Sync conditions: unmetered-only and charging-only

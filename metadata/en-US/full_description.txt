@@ -1,0 +1,23 @@
+Sidecar is a Syncthing client with a browsable index and on-demand downloads.
+
+Your phone receives the complete file list from your other devices without
+receiving the files themselves. Browse the whole tree, then tap a file to pull
+just that one. A 50,000-file folder can sit on your phone using a few dozen
+kilobytes until you ask for something.
+
+Synced folders also appear in Android's file picker, so any app can open a file
+from them — including files that were never downloaded, which are streamed from
+your other devices as they are read.
+
+Features:
+
+* Browse the full file list without downloading it
+* Pin individual files or folders to keep them in sync
+* Open and stream files that are not on the device
+* Appears in the system file picker, with search
+* Runs in the background without the six-hour cap that limits other sync apps
+* Sync only on unmetered Wi-Fi, or only while charging
+* No accounts, no servers, no telemetry
+
+Sidecar uses SushitrainCore, the sync engine from Synctrain for iOS, and is not
+affiliated with Syncthing or Synctrain.
