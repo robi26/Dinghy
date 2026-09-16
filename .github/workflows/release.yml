@@ -36,6 +36,13 @@ jobs:
           cache-dependency-path: core/go.sum
 
       - uses: android-actions/setup-android@v4
+        with:
+          # The action's default package list is "tools platform-tools", and
+          # the obsolete "tools" package is no longer in Google's repository:
+          # sdkmanager exits 1 with "Failed to find package 'tools'" and takes
+          # the whole job with it. Nothing here needs it -- the NDK is
+          # installed by name below.
+          packages: platform-tools
 
       - name: Install NDK
         run: sdkmanager --install "ndk;30.0.16248370"
