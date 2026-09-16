@@ -62,7 +62,14 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                 add(Root.COLUMN_TITLE, context.getString(R.string.app_name))
                 add(Root.COLUMN_SUMMARY, folder.label)
                 add(Root.COLUMN_ICON, R.mipmap.ic_launcher)
-                add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_IS_CHILD or Root.FLAG_SUPPORTS_SEARCH)
+                add(
+                    Root.COLUMN_FLAGS,
+                    // Without FLAG_SUPPORTS_CREATE the root is browsable but never
+                    // offered as a destination by a "save to..." dialog.
+                    Root.FLAG_SUPPORTS_IS_CHILD or
+                        Root.FLAG_SUPPORTS_SEARCH or
+                        Root.FLAG_SUPPORTS_CREATE,
+                )
             }
         }
         return cursor
@@ -173,7 +180,16 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                     "Cannot write $path: it is not downloaded to this device",
                 )
             }
-            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
+            // The index only learns about the write once the folder is
+            // scanned. Scanning when the writer closes costs one scan of one
+            // path and is what turns a file copied in here into a file the
+            // peers receive; the alternative is waiting for the filesystem
+            // watcher, or up to an hour for the periodic rescan.
+            return ParcelFileDescriptor.open(
+                file,
+                ParcelFileDescriptor.parseMode(mode),
+                proxyHandler,
+            ) { SyncEngine.rescanLater(folderId, path) }
         }
         val entry = runBlocking { SyncEngine.entry(folderId, path) }
             ?: throw FileNotFoundException("no entry $documentId")
@@ -222,6 +238,24 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         if (!created) throw FileNotFoundException("could not create $displayName")
 
         val childPath = if (parentPath.isEmpty()) displayName else "$parentPath/$displayName"
+
+        // An on-demand folder ignores everything it was not told to keep, and
+        // an ignored file is never offered to a peer: unselected, the new file
+        // would sit on this device and go nowhere. The rollback matters as much
+        // as the selection -- a file that cannot be selected has not been
+        // backed up, and failing here says so rather than leaving a copy that
+        // looks synced and is not.
+        try {
+            runBlocking { SyncEngine.selectLocalFile(folderId, childPath) }
+        } catch (e: Exception) {
+            target.delete()
+            throw FileNotFoundException("could not select $displayName: ${e.message}")
+        }
+
+        // A file is scanned when its writer closes, in openDocument. A
+        // directory has no write to wait for.
+        if (mimeType == Document.MIME_TYPE_DIR) SyncEngine.rescanLater(folderId, childPath)
+
         return documentId(folderId, childPath)
     }
 

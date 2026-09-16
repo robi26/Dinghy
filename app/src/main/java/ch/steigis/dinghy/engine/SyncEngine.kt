@@ -12,6 +12,7 @@ import ch.steigis.dinghy.binding.sushitrain.ListOfStrings
 import ch.steigis.dinghy.binding.sushitrain.Peer
 import ch.steigis.dinghy.binding.sushitrain.Sushitrain
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -45,6 +47,14 @@ import kotlinx.coroutines.withContext
  */
 object SyncEngine {
     private const val TAG = "SyncEngine"
+
+    /**
+     * Selecting a path rewrites .stignore, which makes the folder scan, and a
+     * folder that is mid-scan refuses the next selection. Copying a batch of
+     * files in is exactly that situation, so a busy folder is waited out.
+     */
+    private const val SELECT_ATTEMPTS = 10
+    private const val SELECT_RETRY_MILLIS = 300L
 
     /** Single thread so calls into Go are serialized and ordered. */
     private val engineDispatcher =
@@ -240,12 +250,6 @@ object SyncEngine {
         refreshState()
     }
 
-    /**
-     * The entry's modification time, or null when there is not one.
-     *
-     * An entry the index has no date for comes back as a zero Date, which would
-     * otherwise read as 1970 rather than being omitted.
-     */
     private fun Entry.modifiedMillis(): Long? =
         runCatching { modifiedAt()?.unixMilliseconds() }.getOrNull()?.takeIf { it > 0 }
 
@@ -328,6 +332,53 @@ object SyncEngine {
             val entry = folder.getFileInformation(path) ?: error("no such entry")
             entry.setExplicitlySelected(selected)
         }
+
+    /**
+     * Selects a path that is on disk but not in the index yet.
+     *
+     * The counterpart of [setSelected] for files this device is the source of.
+     * An on-demand folder's .stignore ends in a catch-all "*", and Syncthing
+     * never offers an ignored file to a peer, so a file written into such a
+     * folder stays on the phone unless it is selected here. [setSelected]
+     * cannot do it: it works from a global index entry, which a file that
+     * exists only locally does not have.
+     *
+     * A folder that syncs in full ignores nothing, so there is nothing to do.
+     */
+    suspend fun selectLocalFile(folderId: String, path: String): Unit =
+        withContext(engineDispatcher) {
+            val running = client ?: error("engine is not running")
+            val folder = running.folderWithID(folderId) ?: error("no folder $folderId")
+            if (!folder.isSelective) return@withContext
+
+            var failure: Exception? = null
+            repeat(SELECT_ATTEMPTS) { attempt ->
+                try {
+                    folder.setLocalFileExplicitlySelected(path, true)
+                    return@withContext
+                } catch (e: Exception) {
+                    failure = e
+                    Log.d(TAG, "could not select $path yet (attempt ${attempt + 1})", e)
+                    if (attempt < SELECT_ATTEMPTS - 1) delay(SELECT_RETRY_MILLIS)
+                }
+            }
+            throw IOException("could not select $path: ${failure?.message}", failure)
+        }
+
+    /**
+     * Asks the engine to index one path now, rather than leaving it to the
+     * filesystem watcher or the hourly rescan.
+     *
+     * Fire-and-forget by design: the scan runs asynchronously inside the engine
+     * anyway, and the caller is a file-descriptor close callback that must not
+     * block on it.
+     */
+    fun rescanLater(folderId: String, path: String) {
+        scope.launch {
+            runCatching { client?.folderWithID(folderId)?.rescanSubdirectory(path) }
+                .onFailure { Log.w(TAG, "could not rescan $path", it) }
+        }
+    }
 
     suspend fun entry(folderId: String, path: String): EntryInfo? =
         withContext(engineDispatcher) {
