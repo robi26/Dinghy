@@ -1,5 +1,12 @@
 package ch.steigis.dinghy.ui
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,15 +34,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.steigis.dinghy.R
 import ch.steigis.dinghy.engine.DeviceInfo
 import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.FolderInfo
 import ch.steigis.dinghy.engine.SyncEngine
+import ch.steigis.dinghy.photos.hasFullLibraryAccess
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -121,8 +134,60 @@ private fun FolderInfo.summary(): String = buildString {
 fun AddFolderScreen(contentPadding: PaddingValues, onAdded: () -> Unit) {
     var folderId by remember { mutableStateOf("") }
     var onDemand by remember { mutableStateOf(true) }
+    var photos by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    fun add() {
+        val id = folderId.trim()
+        scope.launch {
+            message = try {
+                if (photos) SyncEngine.addPhotoFolder(id) else SyncEngine.addFolder(id, onDemand)
+                folderId = ""
+                // Back to the list the folder is now in.
+                onAdded()
+                null
+            } catch (t: Throwable) {
+                t.message ?: t.javaClass.simpleName
+            }
+        }
+    }
+
+    // Whether the whole library can be read, kept current across a trip to the
+    // system settings and back.
+    var fullAccess by remember { mutableStateOf(hasFullLibraryAccess(context)) }
+    var useSettings by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+            fullAccess = hasFullLibraryAccess(context)
+            // Coming back from the settings with access granted: the warning
+            // about not having it is now wrong.
+            if (fullAccess) message = null
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Partial access ("Select photos") leaves READ_MEDIA_IMAGES denied, which
+    // is the outcome we want: a folder holding only the photos picked in that
+    // dialog would delete the rest from every device once it synced.
+    val photoAccess = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        fullAccess = granted[readImagesPermission()] == true && hasFullLibraryAccess(context)
+        if (fullAccess) {
+            add()
+        } else {
+            // Asking again from here reopens the photo picker rather than the
+            // allow/limit dialog, so there is no way back to full access from
+            // inside the app: the system settings are the only route.
+            message = context.getString(R.string.photo_folder_denied)
+            useSettings = true
+        }
+    }
 
     TabColumn(contentPadding) {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -143,37 +208,61 @@ fun AddFolderScreen(contentPadding: PaddingValues, onAdded: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = onDemand, onCheckedChange = { onDemand = it })
+                    Checkbox(
+                        checked = photos,
+                        onCheckedChange = { photos = it; message = null },
+                    )
                     Column {
                         Text(
-                            stringResource(R.string.folder_on_demand_title),
+                            stringResource(R.string.folder_photos_title),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            stringResource(R.string.folder_on_demand_help),
+                            stringResource(R.string.folder_photos_help),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+                // A photo folder has nothing to fetch on demand: it sends the
+                // library and never receives anything.
+                if (!photos) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = onDemand, onCheckedChange = { onDemand = it })
+                        Column {
+                            Text(
+                                stringResource(R.string.folder_on_demand_title),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                stringResource(R.string.folder_on_demand_help),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 Button(
                     enabled = folderId.isNotBlank(),
                     onClick = {
-                        val id = folderId.trim()
-                        scope.launch {
-                            message = try {
-                                SyncEngine.addFolder(id, onDemand)
-                                folderId = ""
-                                // Back to the list the folder is now in.
-                                onAdded()
-                                null
-                            } catch (t: Throwable) {
-                                t.message ?: t.javaClass.simpleName
-                            }
+                        when {
+                            !photos || fullAccess -> add()
+                            useSettings -> context.startActivity(appSettings(context.packageName))
+                            else -> photoAccess.launch(photoPermissions())
                         }
                     },
-                ) { Text(stringResource(R.string.action_add_folder_button)) }
+                ) {
+                    Text(
+                        when {
+                            !photos -> stringResource(R.string.action_add_folder_button)
+                            useSettings && !fullAccess ->
+                                stringResource(R.string.action_photo_settings)
+
+                            else -> stringResource(R.string.action_add_photo_folder_button)
+                        },
+                    )
+                }
             }
         }
     }
@@ -219,16 +308,31 @@ fun FolderSettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.folder_on_demand_title),
+                        stringResource(
+                            if (folder?.isPhotoFolder == true) {
+                                R.string.folder_photos_title
+                            } else {
+                                R.string.folder_on_demand_title
+                            },
+                        ),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
-                        stringResource(R.string.folder_on_demand_summary),
+                        stringResource(
+                            if (folder?.isPhotoFolder == true) {
+                                R.string.folder_photos_summary
+                            } else {
+                                R.string.folder_on_demand_summary
+                            },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(
+                // A photo folder is neither selective nor writable: there is
+                // nothing here to switch, and switching it would rewrite an
+                // .stignore the virtual filesystem cannot hold.
+                if (folder?.isPhotoFolder != true) Switch(
                     checked = folder?.isSelective == true,
                     enabled = folder != null,
                     onCheckedChange = { wantSelective ->
@@ -349,15 +453,21 @@ fun FolderSettingsScreen(
                     // Opt in, not out. Unlinking leaves the downloaded files
                     // alone; deleting them is not recoverable from in here, so
                     // it has to be asked for rather than assumed.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = deleteFiles,
-                            onCheckedChange = { deleteFiles = it },
-                        )
-                        Text(
-                            stringResource(R.string.remove_folder_delete),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                    //
+                    // A photo folder holds no files of its own -- they are the
+                    // library's -- so there is nothing to offer to delete, and
+                    // offering it would read as "delete my photos".
+                    if (folder?.isPhotoFolder != true) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = deleteFiles,
+                                onCheckedChange = { deleteFiles = it },
+                            )
+                            Text(
+                                stringResource(R.string.remove_folder_delete),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                     if (deleteFiles) {
                         Text(
@@ -398,3 +508,29 @@ private fun formatBytes(bytes: Long): String {
     }
     return String.format("%.1f %s", value, units[unit])
 }
+
+/** The permission that reading the photo library needs, by platform version. */
+private fun readImagesPermission(): String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+/**
+ * Asked for together: without ACCESS_MEDIA_LOCATION the system strips the GPS
+ * tags out of every photo it hands over, so the backup would lose them.
+ */
+private fun photoPermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        arrayOf(readImagesPermission(), Manifest.permission.ACCESS_MEDIA_LOCATION)
+    } else {
+        arrayOf(readImagesPermission())
+    }
+
+/** The app's own page in the system settings, where access can be widened. */
+private fun appSettings(packageName: String): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", packageName, null)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }

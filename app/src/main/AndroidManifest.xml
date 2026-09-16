@@ -20,6 +20,28 @@
          addresses have to be entered by hand. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- A photo folder reads the library directly; nothing is ever copied, so
+         this is the only way its files can be served. Read-only, and only
+         asked for when such a folder is created. Partial ("selected photos")
+         access is deliberately not supported: the folder would then hold only
+         the chosen photos, and changing that selection would delete the rest
+         from every device holding the backup.
+
+         READ_MEDIA_VISUAL_USER_SELECTED is declared in order to *detect* that
+         case, not to use it. Without the declaration Android 14+ runs the app
+         in a compatibility mode where READ_MEDIA_IMAGES reads as granted while
+         MediaStore quietly returns only the photos the user picked, which is
+         exactly the situation that must not pass for a backup. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Without this, Android 10+ serves photos with their GPS tags removed,
+         so the backup would lose where every photo was taken. -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
     <!-- A foreground service must post a notification to run reliably. Users
          who do not want it can disable the channel and still grant this. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

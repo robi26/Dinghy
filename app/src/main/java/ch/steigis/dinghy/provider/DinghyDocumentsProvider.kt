@@ -62,7 +62,16 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                 add(Root.COLUMN_TITLE, context.getString(R.string.app_name))
                 add(Root.COLUMN_SUMMARY, folder.label)
                 add(Root.COLUMN_ICON, R.mipmap.ic_launcher)
-                add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_IS_CHILD or Root.FLAG_SUPPORTS_SEARCH)
+                add(
+                    Root.COLUMN_FLAGS,
+                    // Without FLAG_SUPPORTS_CREATE the root is browsable but never
+                    // offered as a destination by a "save to..." dialog. A photo
+                    // folder is the photo library seen through Syncthing: it has
+                    // no disk behind it to write to.
+                    Root.FLAG_SUPPORTS_IS_CHILD or
+                        Root.FLAG_SUPPORTS_SEARCH or
+                        if (folder.isPhotoFolder) 0 else Root.FLAG_SUPPORTS_CREATE,
+                )
             }
         }
         return cursor
@@ -83,14 +92,17 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                 add(Document.COLUMN_MIME_TYPE, Document.MIME_TYPE_DIR)
                 add(Document.COLUMN_SIZE, null)
                 add(Document.COLUMN_LAST_MODIFIED, null)
-                add(Document.COLUMN_FLAGS, Document.FLAG_DIR_SUPPORTS_CREATE)
+                add(
+                    Document.COLUMN_FLAGS,
+                    if (folder.isPhotoFolder) 0 else Document.FLAG_DIR_SUPPORTS_CREATE,
+                )
             }
             return cursor
         }
 
         val entry = runBlocking { SyncEngine.entry(folderId, path) }
             ?: throw FileNotFoundException("no entry $documentId")
-        cursor.addEntry(folderId, entry)
+        cursor.addEntry(folderId, entry, !runBlocking { SyncEngine.isPhotoFolder(folderId) })
         return cursor
     }
 
@@ -103,8 +115,9 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         val (folderId, path) = parse(parentDocumentId)
         val prefix = if (path.isEmpty()) "" else path.trimEnd('/') + "/"
 
+        val writable = !runBlocking { SyncEngine.isPhotoFolder(folderId) }
         runBlocking { SyncEngine.browse(folderId, prefix) }
-            .forEach { cursor.addEntry(folderId, it) }
+            .forEach { cursor.addEntry(folderId, it, writable) }
         return cursor
     }
 
@@ -146,8 +159,9 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         if (query.isBlank()) return cursor
         // Searches the global index, so results include files that are not on
         // this device -- the same set the in-app browser shows.
+        val writable = !runBlocking { SyncEngine.isPhotoFolder(rootId) }
         runBlocking { SyncEngine.search(query, rootId, SEARCH_LIMIT) }
-            .forEach { cursor.addEntry(rootId, it) }
+            .forEach { cursor.addEntry(rootId, it, writable) }
         return cursor
     }
 
@@ -173,7 +187,16 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                     "Cannot write $path: it is not downloaded to this device",
                 )
             }
-            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
+            // The index only learns about the write once the folder is
+            // scanned. Scanning when the writer closes costs one scan of one
+            // path and is what turns a file copied in here into a file the
+            // peers receive; the alternative is waiting for the filesystem
+            // watcher, or up to an hour for the periodic rescan.
+            return ParcelFileDescriptor.open(
+                file,
+                ParcelFileDescriptor.parseMode(mode),
+                proxyHandler,
+            ) { SyncEngine.rescanLater(folderId, path) }
         }
         val entry = runBlocking { SyncEngine.entry(folderId, path) }
             ?: throw FileNotFoundException("no entry $documentId")
@@ -222,6 +245,24 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         if (!created) throw FileNotFoundException("could not create $displayName")
 
         val childPath = if (parentPath.isEmpty()) displayName else "$parentPath/$displayName"
+
+        // An on-demand folder ignores everything it was not told to keep, and
+        // an ignored file is never offered to a peer: unselected, the new file
+        // would sit on this device and go nowhere. The rollback matters as much
+        // as the selection -- a file that cannot be selected has not been
+        // backed up, and failing here says so rather than leaving a copy that
+        // looks synced and is not.
+        try {
+            runBlocking { SyncEngine.selectLocalFile(folderId, childPath) }
+        } catch (e: Exception) {
+            target.delete()
+            throw FileNotFoundException("could not select $displayName: ${e.message}")
+        }
+
+        // A file is scanned when its writer closes, in openDocument. A
+        // directory has no write to wait for.
+        if (mimeType == Document.MIME_TYPE_DIR) SyncEngine.rescanLater(folderId, childPath)
+
         return documentId(folderId, childPath)
     }
 
@@ -260,7 +301,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
 
     // ---- helpers -----------------------------------------------------------
 
-    private fun MatrixCursor.addEntry(folderId: String, entry: EntryInfo) {
+    private fun MatrixCursor.addEntry(folderId: String, entry: EntryInfo, writable: Boolean) {
         newRow().apply {
             add(Document.COLUMN_DOCUMENT_ID, documentId(folderId, entry.path))
             add(Document.COLUMN_DISPLAY_NAME, entry.name)
@@ -274,7 +315,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
             // disk cannot be renamed, deleted or written.
             add(
                 Document.COLUMN_FLAGS,
-                if (!entry.isLocallyPresent) {
+                if (!entry.isLocallyPresent || !writable) {
                     0
                 } else if (entry.isDirectory) {
                     Document.FLAG_DIR_SUPPORTS_CREATE or

@@ -83,6 +83,13 @@
     <string name="file_modified_unknown">No modification date in the index</string>
     <string name="label_folder_sync">Syncing</string>
     <string name="folder_on_demand_summary">Keep the file list, download only what you ask for</string>
+
+    <string name="folder_photos_title">Back up this device\'s photos</string>
+    <string name="folder_photos_help">Syncs the photo library itself. Nothing is copied: photos are read from the library as your other devices ask for them.</string>
+    <string name="folder_photos_summary">Send-only. Photos are read from the library; a photo deleted here is deleted on your other devices too.</string>
+    <string name="action_add_photo_folder_button">Add photo folder</string>
+    <string name="photo_folder_denied">Dinghy needs access to all photos. Selecting individual photos is not enough: the folder would hold only those, and syncing it would remove the rest from your other devices. Allow all photos in Android\'s settings for Dinghy.</string>
+    <string name="action_photo_settings">Open settings</string>
     <string name="full_sync_title">Download everything?</string>
     <string name="full_sync_body">Turning off on-demand downloads the whole folder to this device, now and as it changes. That is %1$s.</string>
     <string name="action_download_everything">Download everything</string>

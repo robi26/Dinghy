@@ -32,6 +32,51 @@ Foreground service ┘                      │
                        .stignore pulling)       Range requests
 ```
 
+## Photo backup
+
+A **photo folder** syncs the device's photo library without copying any of it.
+The library is presented to Syncthing as an ordinary send-only folder whose
+files are made up on demand from MediaStore, laid out as `YYYY/MM/name.jpg`,
+and a photo's bytes are read from the library rather than from a copy on disk.
+Add one with "Back up this device's photos" on the add-folder screen.
+
+Reading is not only for peers, and it is worth knowing before pointing this at
+a large library: Syncthing hashes a file to build its block list, which reads
+the whole photo through MediaStore. So the first scan reads the library once,
+end to end, and later scans read whatever is new or changed -- an unchanged
+photo is not read again, because its size and date still match the index. One
+photo is held in memory at a time.
+
+This is the Android half of the upstream project's photo folders
+(`external/sushitrain/Docs/photo-fs.md`): the Go side implements Syncthing's
+filesystem interface over a small tree interface, and `PhotoFilesystem.kt`
+supplies that tree from MediaStore. It is registered before the configuration
+is loaded, because a folder's filesystem is built as soon as its configuration
+is read.
+
+What it is not is a copy. The folder mirrors the library, so a photo deleted on
+the phone is deleted on every peer that holds it; keep file versioning on
+whatever receives the folder if the point is to be able to get a photo back.
+The consequences of that are what the implementation is careful about:
+
+- **Partial photo access is refused.** Android 14+ offers "select photos",
+  which would make the folder hold those photos and delete every other one
+  from the peers. It is detected by declaring `READ_MEDIA_VISUAL_USER_SELECTED`
+  in the manifest -- without that declaration, `READ_MEDIA_IMAGES` reads as
+  granted while MediaStore silently returns only the chosen photos.
+- **A library that cannot be read is an error, never an empty folder.** Empty
+  means "everything was deleted" to Syncthing.
+- **The reported size is the size of the bytes that will be sent**, measured
+  from the same URI the data is read from. They differ: without
+  `ACCESS_MEDIA_LOCATION` the system serves a copy with the GPS tags removed.
+- Photos still being written are skipped (`IS_PENDING`), grouping is by UTC so
+  that travelling does not move every photo into another directory, and photos
+  are grouped per month because the Go side finds an entry by scanning its
+  parent's children.
+
+Videos are not included: the filesystem interface hands a file over as one byte
+array, which is fine for a photo and not for a video.
+
 ## Building
 
 Everything installs project-locally under `toolchains/`; nothing is installed

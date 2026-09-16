@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import ch.steigis.dinghy.engine.EngineState
 import ch.steigis.dinghy.engine.SyncEngine
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -143,10 +144,58 @@ class DocumentsProviderTest {
         }
     }
 
+    /**
+     * The other direction: a file written through the picker has to leave the
+     * device. In an on-demand folder everything is ignored by default, so the
+     * file only reaches a peer if the provider selected it and had it scanned.
+     *
+     * Writes into whatever folder the device syncs, and deletes what it wrote:
+     * a peer will see the file appear and disappear.
+     */
+    @Test
+    fun aCreatedFileIsSelectedAndIndexed() {
+        val folder = runBlocking { SyncEngine.folders() }.firstOrNull { it.isSelective }
+        assumeTrue("no on-demand folder configured", folder != null)
+
+        val parent = DocumentsContract.buildDocumentUri(AUTHORITY, "${folder!!.id}:")
+        val name = "dinghy-upload-test-${System.currentTimeMillis()}.txt"
+        val uri = DocumentsContract
+            .createDocument(context.contentResolver, parent, "text/plain", name)
+        requireNotNull(uri) { "createDocument returned nothing" }
+
+        try {
+            val content = ByteArray(WRITE_LENGTH) { it.toByte() }
+            context.contentResolver.openOutputStream(uri, "w").use { stream ->
+                requireNotNull(stream).write(content)
+            }
+
+            // The scan the close triggers is asynchronous inside the engine.
+            val indexed = runBlocking {
+                withTimeoutOrNull(SCAN_TIMEOUT_MS) {
+                    var entry = SyncEngine.entry(folder.id, name)
+                    while (entry == null || entry.size != content.size.toLong()) {
+                        delay(POLL_MILLIS)
+                        entry = SyncEngine.entry(folder.id, name)
+                    }
+                    entry
+                }
+            }
+
+            requireNotNull(indexed) { "$name never made it into the index" }
+            assertTrue("created file is ignored, so no peer will ever get it", indexed.isSelected)
+            assertTrue("created file is not on disk", indexed.isLocallyPresent)
+        } finally {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        }
+    }
+
     private companion object {
         const val AUTHORITY = "ch.steigis.dinghy.documents"
         const val READ_AT = 5_000_000L
         const val READ_LENGTH = 4096
         const val PEER_TIMEOUT_MS = 60_000L
+        const val WRITE_LENGTH = 4096
+        const val SCAN_TIMEOUT_MS = 30_000L
+        const val POLL_MILLIS = 500L
     }
 }
