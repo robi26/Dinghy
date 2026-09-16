@@ -1,0 +1,7 @@
+Back up your photos, without copying them anywhere.
+
+* A photo folder syncs your photo library as it is, with no second copy on the phone
+* Photos reach your other devices sorted by year and month, as you take them
+* It mirrors the library: a photo you delete here is deleted on your other devices too
+* Files copied into a folder from the file picker now actually reach your other devices
+* Dinghy is offered as a destination when another app saves a file
