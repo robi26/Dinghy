@@ -65,10 +65,12 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                 add(
                     Root.COLUMN_FLAGS,
                     // Without FLAG_SUPPORTS_CREATE the root is browsable but never
-                    // offered as a destination by a "save to..." dialog.
+                    // offered as a destination by a "save to..." dialog. A photo
+                    // folder is the photo library seen through Syncthing: it has
+                    // no disk behind it to write to.
                     Root.FLAG_SUPPORTS_IS_CHILD or
                         Root.FLAG_SUPPORTS_SEARCH or
-                        Root.FLAG_SUPPORTS_CREATE,
+                        if (folder.isPhotoFolder) 0 else Root.FLAG_SUPPORTS_CREATE,
                 )
             }
         }
@@ -90,14 +92,17 @@ class DinghyDocumentsProvider : DocumentsProvider() {
                 add(Document.COLUMN_MIME_TYPE, Document.MIME_TYPE_DIR)
                 add(Document.COLUMN_SIZE, null)
                 add(Document.COLUMN_LAST_MODIFIED, null)
-                add(Document.COLUMN_FLAGS, Document.FLAG_DIR_SUPPORTS_CREATE)
+                add(
+                    Document.COLUMN_FLAGS,
+                    if (folder.isPhotoFolder) 0 else Document.FLAG_DIR_SUPPORTS_CREATE,
+                )
             }
             return cursor
         }
 
         val entry = runBlocking { SyncEngine.entry(folderId, path) }
             ?: throw FileNotFoundException("no entry $documentId")
-        cursor.addEntry(folderId, entry)
+        cursor.addEntry(folderId, entry, !runBlocking { SyncEngine.isPhotoFolder(folderId) })
         return cursor
     }
 
@@ -110,8 +115,9 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         val (folderId, path) = parse(parentDocumentId)
         val prefix = if (path.isEmpty()) "" else path.trimEnd('/') + "/"
 
+        val writable = !runBlocking { SyncEngine.isPhotoFolder(folderId) }
         runBlocking { SyncEngine.browse(folderId, prefix) }
-            .forEach { cursor.addEntry(folderId, it) }
+            .forEach { cursor.addEntry(folderId, it, writable) }
         return cursor
     }
 
@@ -153,8 +159,9 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         if (query.isBlank()) return cursor
         // Searches the global index, so results include files that are not on
         // this device -- the same set the in-app browser shows.
+        val writable = !runBlocking { SyncEngine.isPhotoFolder(rootId) }
         runBlocking { SyncEngine.search(query, rootId, SEARCH_LIMIT) }
-            .forEach { cursor.addEntry(rootId, it) }
+            .forEach { cursor.addEntry(rootId, it, writable) }
         return cursor
     }
 
@@ -294,7 +301,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
 
     // ---- helpers -----------------------------------------------------------
 
-    private fun MatrixCursor.addEntry(folderId: String, entry: EntryInfo) {
+    private fun MatrixCursor.addEntry(folderId: String, entry: EntryInfo, writable: Boolean) {
         newRow().apply {
             add(Document.COLUMN_DOCUMENT_ID, documentId(folderId, entry.path))
             add(Document.COLUMN_DISPLAY_NAME, entry.name)
@@ -308,7 +315,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
             // disk cannot be renamed, deleted or written.
             add(
                 Document.COLUMN_FLAGS,
-                if (!entry.isLocallyPresent) {
+                if (!entry.isLocallyPresent || !writable) {
                     0
                 } else if (entry.isDirectory) {
                     Document.FLAG_DIR_SUPPORTS_CREATE or

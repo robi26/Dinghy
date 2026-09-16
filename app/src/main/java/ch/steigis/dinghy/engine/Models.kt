@@ -6,6 +6,12 @@ data class FolderInfo(
     val label: String,
     val path: String,
     val isSelective: Boolean,
+    /**
+     * The folder is the device's photo library rather than files on disk. Its
+     * contents are read from MediaStore on demand, it is send-only, and it has
+     * no path that anything else can write to.
+     */
+    val isPhotoFolder: Boolean = false,
     val isPaused: Boolean,
     val connectedPeers: Int,
     /** Everything the folder knows about, downloaded or not. */

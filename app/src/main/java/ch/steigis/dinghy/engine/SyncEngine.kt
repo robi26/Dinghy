@@ -11,6 +11,9 @@ import ch.steigis.dinghy.binding.sushitrain.SearchResultDelegate
 import ch.steigis.dinghy.binding.sushitrain.ListOfStrings
 import ch.steigis.dinghy.binding.sushitrain.Peer
 import ch.steigis.dinghy.binding.sushitrain.Sushitrain
+import ch.steigis.dinghy.photos.PHOTO_FS_TYPE
+import ch.steigis.dinghy.photos.PhotoFolderConfig
+import ch.steigis.dinghy.photos.PhotoFilesystem
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -55,6 +58,12 @@ object SyncEngine {
      */
     private const val SELECT_ATTEMPTS = 10
     private const val SELECT_RETRY_MILLIS = 300L
+
+    /** How long to let photo-library changes settle before scanning. */
+    private const val PHOTO_RESCAN_DEBOUNCE_MILLIS = 30_000L
+
+    /** Long enough for a folder to come back after a configuration change. */
+    private const val FOLDER_RESTART_MILLIS = 2_000L
 
     /** Single thread so calls into Go are serialized and ordered. */
     private val engineDispatcher =
@@ -104,6 +113,11 @@ object SyncEngine {
 
             _state.value = EngineState.Loading
             Log.i(TAG, "loading engine: config=$configDir files=$filesDir")
+
+            // Before load(): the engine instantiates a photo folder's
+            // filesystem as soon as it reads that folder's configuration, and
+            // an unregistered filesystem type is a folder that cannot start.
+            registerPhotoFilesystem(context)
 
             val created = Sushitrain.newClient(configDir.absolutePath, filesDir.absolutePath, false)
                 ?: error("SushitrainCore returned no client")
@@ -231,6 +245,8 @@ object SyncEngine {
                 label = folder.label().ifEmpty { id },
                 path = folder.path(),
                 isSelective = folder.isSelective,
+                isPhotoFolder = runCatching { folder.filesystemType() }
+                    .getOrNull() == PHOTO_FS_TYPE,
                 isPaused = folder.isPaused,
                 connectedPeers = folder.connectedPeerCount().toInt(),
                 globalFiles = stats?.global?.files ?: 0,
@@ -250,6 +266,96 @@ object SyncEngine {
         refreshState()
     }
 
+    /**
+     * Adds a folder that *is* the device's photo library.
+     *
+     * Nothing is copied into it: its files are served straight from MediaStore
+     * by [PhotoFilesystem]. Send-only because the virtual filesystem cannot be
+     * written to, and because a backup that can be written from the far end is
+     * not a backup.
+     *
+     * The path a normal folder would have is where the layout settings live --
+     * for a virtual filesystem the engine only passes the string through.
+     */
+    suspend fun addPhotoFolder(folderId: String) = withContext(engineDispatcher) {
+        val running = client ?: error("engine is not running")
+        running.addSpecialFolder(
+            folderId,
+            PHOTO_FS_TYPE,
+            PhotoFolderConfig.DEFAULT_JSON,
+            "sendonly",
+        )
+        running.folderWithID(folderId)?.let { folder ->
+            // The virtual filesystem has nothing to watch: changes arrive as
+            // MediaStore notifications instead. Left on, the folder would
+            // retry a watcher it can never start, once a minute, forever.
+            runCatching { folder.isWatcherEnabled = false }
+                .onFailure { Log.w(TAG, "could not disable the watcher for $folderId", it) }
+        }
+
+        // That configuration change restarts the folder, which cancels the
+        // scan it began when it was created ("hashing: context canceled").
+        // Without another one the folder stays empty until the hourly rescan,
+        // which is an hour of a backup that looks like it is not working.
+        scope.launch {
+            delay(FOLDER_RESTART_MILLIS)
+            runCatching { client?.folderWithID(folderId)?.rescan() }
+                .onFailure { Log.w(TAG, "could not scan $folderId", it) }
+        }
+        refreshState()
+    }
+
+    /** Whether a folder is the photo library rather than files on disk. */
+    suspend fun isPhotoFolder(folderId: String): Boolean = withContext(engineDispatcher) {
+        val running = client ?: return@withContext false
+        val folder = running.folderWithID(folderId) ?: return@withContext false
+        runCatching { folder.filesystemType() }.getOrNull() == PHOTO_FS_TYPE
+    }
+
+    private var photoFilesystem: PhotoFilesystem? = null
+
+    @Volatile
+    private var photoRescanJob: Job? = null
+
+    private fun registerPhotoFilesystem(context: Context) {
+        if (photoFilesystem != null) return
+        val filesystem = PhotoFilesystem(context)
+        filesystem.onLibraryChanged = ::onPhotoLibraryChanged
+        Sushitrain.registerCustomFilesystemType(PHOTO_FS_TYPE, filesystem)
+        photoFilesystem = filesystem
+        Log.i(TAG, "registered the photo filesystem as $PHOTO_FS_TYPE")
+    }
+
+    /**
+     * A new photo is only noticed when the folder is scanned, and the virtual
+     * filesystem cannot be watched, so a library change asks for the scan
+     * itself.
+     *
+     * Debounced because MediaStore reports every write: a burst of shots, or a
+     * download of fifty images, would otherwise mean fifty scans of the whole
+     * library.
+     */
+    private fun onPhotoLibraryChanged() {
+        photoRescanJob?.cancel()
+        photoRescanJob = scope.launch {
+            delay(PHOTO_RESCAN_DEBOUNCE_MILLIS)
+            val running = client ?: return@launch
+            running.folders().toList().forEach { id ->
+                val folder = running.folderWithID(id) ?: return@forEach
+                if (folder.filesystemType() != PHOTO_FS_TYPE) return@forEach
+                Log.i(TAG, "photo library changed; rescanning $id")
+                runCatching { folder.rescan() }
+                    .onFailure { Log.w(TAG, "could not rescan $id", it) }
+            }
+        }
+    }
+
+    /**
+     * The entry's modification time, or null when there is not one.
+     *
+     * An entry the index has no date for comes back as a zero Date, which would
+     * otherwise read as 1970 rather than being omitted.
+     */
     private fun Entry.modifiedMillis(): Long? =
         runCatching { modifiedAt()?.unixMilliseconds() }.getOrNull()?.takeIf { it > 0 }
 

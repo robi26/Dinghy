@@ -51,7 +51,12 @@ fun BrowserScreen(
     var error by remember(folderId, prefix) { mutableStateOf<String?>(null) }
     var reloadToken by remember { mutableStateOf(0) }
     var sheetFor by remember { mutableStateOf<EntryInfo?>(null) }
+    // A photo folder is the library seen through Syncthing: there is nothing
+    // to pin (it is all here already) and nothing to download.
+    var photoFolder by remember(folderId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(folderId) { photoFolder = SyncEngine.isPhotoFolder(folderId) }
 
     sheetFor?.let { selected ->
         FileSheet(
@@ -105,6 +110,7 @@ fun BrowserScreen(
             items(current, key = { it.path }) { entry ->
                 EntryRow(
                     entry = entry,
+                    photoFolder = photoFolder,
                     onOpen = {
                         if (entry.isDirectory) {
                             onOpenDirectory(entry.path.trimEnd('/') + "/")
@@ -127,7 +133,12 @@ fun BrowserScreen(
 }
 
 @Composable
-private fun EntryRow(entry: EntryInfo, onOpen: () -> Unit, onToggle: (Boolean) -> Unit) {
+private fun EntryRow(
+    entry: EntryInfo,
+    photoFolder: Boolean,
+    onOpen: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -159,22 +170,30 @@ private fun EntryRow(entry: EntryInfo, onOpen: () -> Unit, onToggle: (Boolean) -
                 fontWeight = if (entry.isDirectory) FontWeight.Medium else FontWeight.Normal,
             )
             Text(
-                entry.subtitle(),
+                entry.subtitle(photoFolder),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Checkbox(
-            checked = entry.isSelected,
-            onCheckedChange = onToggle,
-        )
+        // Pinning writes to .stignore, which a photo folder has no room for:
+        // the checkbox would only ever report an error.
+        if (!photoFolder) {
+            Checkbox(
+                checked = entry.isSelected,
+                onCheckedChange = onToggle,
+            )
+        }
     }
 }
 
-private fun EntryInfo.subtitle(): String = buildString {
+private fun EntryInfo.subtitle(photoFolder: Boolean = false): String = buildString {
     append(
         when {
             isDirectory -> "folder"
+            // The engine reports a file on a virtual filesystem as not
+            // present, because its path does not exist on disk. For a photo
+            // folder that is backwards: this device is where it comes from.
+            photoFolder -> "${formatSize(size)} · in your photo library"
             isLocallyPresent -> "${formatSize(size)} · on device"
             else -> "${formatSize(size)} · not downloaded"
         },
