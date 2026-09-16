@@ -19,6 +19,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.atomic.AtomicLong
 
 /** The filesystem type a photo folder is configured with. */
 const val PHOTO_FS_TYPE = "dinghy.photos.v1"
@@ -257,22 +258,32 @@ private class PhotoLibrary(private val context: Context) {
     private var years: List<CustomFileEntry>? = null
     private var builtAt = 0L
 
-    @Volatile
-    private var stale = true
+    /**
+     * Counts library changes, rather than flagging them.
+     *
+     * A flag cleared after the query would swallow every notification that
+     * arrived while the query was running -- exactly when a photo is being
+     * added -- and the new photo would then stay invisible until the hourly
+     * expiry. The count the build started from is recorded instead, so a
+     * change that lands mid-build leaves the result stale, as it is.
+     */
+    private val changes = AtomicLong()
+    private var builtFor = -1L
 
     fun invalidate() {
-        stale = true
+        changes.incrementAndGet()
     }
 
     fun years(): List<CustomFileEntry> = synchronized(lock) {
         val cached = years
         val age = SystemClock.elapsedRealtime() - builtAt
-        if (cached != null && !stale && age < MAX_AGE_MILLIS) return cached
+        if (cached != null && builtFor == changes.get() && age < MAX_AGE_MILLIS) return cached
 
+        val startedAt = changes.get()
         val built = build()
         years = built
         builtAt = SystemClock.elapsedRealtime()
-        stale = false
+        builtFor = startedAt
         return built
     }
 
@@ -401,12 +412,29 @@ private class PhotoLibrary(private val context: Context) {
         return "%04d/%02d".format(date.year, date.monthValue)
     }
 
-    /** MediaStore display names are not unique; a folder's entries must be. */
+    /**
+     * MediaStore display names are not unique; a folder's entries must be.
+     *
+     * The id is not enough on its own: "photo-7.jpg" is a name a photo can
+     * already have, and two entries with one name in a directory means the Go
+     * side resolves both to whichever it scans first, leaving the other photo
+     * out of the backup entirely. So it keeps going until the name is free.
+     */
     private fun uniqueName(name: String, id: Long, taken: Set<String>): String {
         if (name !in taken) return name
         val stem = name.substringBeforeLast('.', name)
         val extension = name.substringAfterLast('.', "")
-        return if (extension.isEmpty()) "$stem-$id" else "$stem-$id.$extension"
+
+        fun candidate(suffix: String) =
+            if (extension.isEmpty()) "$stem-$suffix" else "$stem-$suffix.$extension"
+
+        var attempt = candidate(id.toString())
+        var next = 2
+        while (attempt in taken) {
+            attempt = candidate("$id-$next")
+            next++
+        }
+        return attempt
     }
 
     private companion object {

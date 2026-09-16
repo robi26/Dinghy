@@ -1,5 +1,6 @@
 package ch.steigis.dinghy.photos
 
+import android.Manifest
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -50,7 +51,29 @@ class PhotoFolderTest {
         // RELATIVE_PATH, and with it inserting into the library without
         // holding a storage permission.
         assumeTrue("needs Android 10+", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+
+        // The folder is empty without this, and the test would do nothing but
+        // wait for a scan that cannot read anything. Granting it here rather
+        // than relying on the device having been prepared by hand: a test that
+        // only passes on the machine it was written on is not a test.
+        grant(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.READ_MEDIA_IMAGES
+            } else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            },
+        )
+        grant(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        assumeTrue("no access to the photo library", hasFullLibraryAccess(context))
+
         assumeTrue("engine did not start", SyncEngine.ensureStartedBlocking(context))
+    }
+
+    private fun grant(permission: String) {
+        runCatching {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, permission)
+        }
     }
 
     @After

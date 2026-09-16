@@ -37,8 +37,15 @@ Foreground service ┘                      │
 A **photo folder** syncs the device's photo library without copying any of it.
 The library is presented to Syncthing as an ordinary send-only folder whose
 files are made up on demand from MediaStore, laid out as `YYYY/MM/name.jpg`,
-and a photo's bytes are read from the library only when a peer asks for that
-file. Add one with "Back up this device's photos" on the add-folder screen.
+and a photo's bytes are read from the library rather than from a copy on disk.
+Add one with "Back up this device's photos" on the add-folder screen.
+
+Reading is not only for peers, and it is worth knowing before pointing this at
+a large library: Syncthing hashes a file to build its block list, which reads
+the whole photo through MediaStore. So the first scan reads the library once,
+end to end, and later scans read whatever is new or changed -- an unchanged
+photo is not read again, because its size and date still match the index. One
+photo is held in memory at a time.
 
 This is the Android half of the upstream project's photo folders
 (`external/sushitrain/Docs/photo-fs.md`): the Go side implements Syncthing's
