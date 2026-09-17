@@ -1,0 +1,7 @@
+Fixes for opening files and for large photo libraries.
+
+* Open now works for every file type, instead of claiming no app can handle it
+* A folder row says how many items it holds
+* The browser has a grid view, with thumbnails for your photos
+* A large photo library no longer stalls the app or leaves it unable to start
+* Photo folders re-read the library in the background instead of blocking on it
