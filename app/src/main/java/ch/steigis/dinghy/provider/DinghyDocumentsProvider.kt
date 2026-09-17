@@ -2,6 +2,7 @@ package ch.steigis.dinghy.provider
 
 import android.database.Cursor
 import android.database.MatrixCursor
+import android.net.Uri
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
@@ -80,6 +81,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
     // ---- documents ---------------------------------------------------------
 
     override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor {
+        requireEngine()
         val cursor = MatrixCursor(projection ?: DEFAULT_DOCUMENT_PROJECTION)
         val (folderId, path) = parse(documentId)
 
@@ -172,6 +174,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         mode: String,
         signal: CancellationSignal?,
     ): ParcelFileDescriptor {
+        requireEngine()
         val (folderId, path) = parse(documentId)
 
         if (mode != "r") {
@@ -301,6 +304,19 @@ class DinghyDocumentsProvider : DocumentsProvider() {
 
     // ---- helpers -----------------------------------------------------------
 
+    /**
+     * queryRoots starts the engine for anything that browses in from the
+     * picker, but a URI handed to another app outlives this process: that app
+     * can come back to a document long after we were killed, and land here
+     * with nothing running.
+     */
+    private fun requireEngine() {
+        val context = context ?: throw FileNotFoundException("no context")
+        if (!SyncEngine.ensureStartedBlocking(context)) {
+            throw FileNotFoundException("the sync engine is not running")
+        }
+    }
+
     private fun MatrixCursor.addEntry(folderId: String, entry: EntryInfo, writable: Boolean) {
         newRow().apply {
             add(Document.COLUMN_DOCUMENT_ID, documentId(folderId, entry.path))
@@ -348,10 +364,22 @@ class DinghyDocumentsProvider : DocumentsProvider() {
         return documentId.substring(0, index) to documentId.substring(index + 1)
     }
 
-    private companion object {
-        const val SEARCH_LIMIT = 200L
+    companion object {
+        /** Must match android:authorities in the manifest. */
+        const val AUTHORITY = "ch.steigis.dinghy.documents"
 
-        val DEFAULT_ROOT_PROJECTION = arrayOf(
+        /**
+         * The content URI for one entry, for handing to another app together
+         * with FLAG_GRANT_READ_URI_PERMISSION. Viewers register intent filters
+         * for content: and file:, never for the engine's http: stream URL, so
+         * passing that URL directly resolves to nothing.
+         */
+        fun documentUri(folderId: String, path: String): Uri =
+            DocumentsContract.buildDocumentUri(AUTHORITY, "$folderId:$path")
+
+        private const val SEARCH_LIMIT = 200L
+
+        private val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,
             Root.COLUMN_DOCUMENT_ID,
             Root.COLUMN_TITLE,
@@ -359,7 +387,7 @@ class DinghyDocumentsProvider : DocumentsProvider() {
             Root.COLUMN_ICON,
             Root.COLUMN_FLAGS,
         )
-        val DEFAULT_DOCUMENT_PROJECTION = arrayOf(
+        private val DEFAULT_DOCUMENT_PROJECTION = arrayOf(
             Document.COLUMN_DOCUMENT_ID,
             Document.COLUMN_DISPLAY_NAME,
             Document.COLUMN_MIME_TYPE,

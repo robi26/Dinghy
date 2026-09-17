@@ -428,6 +428,23 @@ object SyncEngine {
         }
 
     /**
+     * How many entries a directory holds, one level deep.
+     *
+     * Separate from [browse] because it is the cheap half of it: the names
+     * alone answer the question, so this skips the getFileInformation call per
+     * child that building an [EntryInfo] needs. Counts what the *global* index
+     * holds, like everything else here, so it is the same number whether or not
+     * the contents were downloaded.
+     */
+    suspend fun childCount(folderId: String, path: String): Int =
+        withContext(engineDispatcher) {
+            val running = client ?: return@withContext 0
+            val folder = running.folderWithID(folderId) ?: return@withContext 0
+            val prefix = if (path.isEmpty()) "" else path.trimEnd('/') + "/"
+            folder.list(prefix, false, false)?.count()?.toInt() ?: 0
+        }
+
+    /**
      * Pins or unpins an entry. Pinning writes a "!/path" exception ahead of the
      * catch-all "*" in .stignore, which is what makes the content arrive.
      */

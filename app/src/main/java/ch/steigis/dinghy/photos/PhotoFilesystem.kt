@@ -19,6 +19,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /** The filesystem type a photo folder is configured with. */
@@ -45,12 +46,20 @@ const val PHOTO_FS_TYPE = "dinghy.photos.v1"
  *   folder error and which changes no index.
  * - **[CustomFileEntry.bytes] must agree with [CustomFileEntry.data].** The
  *   size is what Syncthing writes into the index; the bytes are what the peer
- *   receives. They are both taken from the same URI here for that reason.
+ *   receives. Both come from the same URI for that reason. When that URI
+ *   serves the original, MediaStore's recorded size is already the answer;
+ *   when it serves a redacted copy the length has to be measured, because
+ *   stripping the GPS tags makes the copy shorter than the file on disk.
  */
 class PhotoFilesystem(context: Context) : CustomFilesystemType {
 
     private val appContext = context.applicationContext
-    private val library = PhotoLibrary(appContext)
+
+    // A rebuild lands asynchronously now, so the folder has to be told to look
+    // again: the scan that triggered it was answered from the previous tree.
+    private val library = PhotoLibrary(appContext).apply {
+        onRebuilt = { this@PhotoFilesystem.onLibraryChanged?.invoke() }
+    }
 
     /** Roots are cached per URI: the engine asks for one per folder start. */
     private val roots = HashMap<String, CustomFileEntry>()
@@ -152,7 +161,28 @@ private class RootEntry(
     // would be a folder change to send on every scan.
     override fun modifiedTime(): Long = 0
 
-    private fun children(): List<CustomFileEntry> = MARKERS + library.years()
+    @Volatile
+    private var joined: Pair<List<CustomFileEntry>, List<CustomFileEntry>>? = null
+
+    /**
+     * The markers and the years as one list, rebuilt only when the library is.
+     *
+     * Go resolves a path by asking for the count and then for each child in
+     * turn, so this is called a handful of times per lookup and a lookup
+     * happens per photo per scan. Concatenating afresh each time made that a
+     * few hundred thousand throwaway lists over a library of any size.
+     *
+     * Compared by identity, not equality: [PhotoLibrary.years] hands back the
+     * same list until it rebuilds, and a rebuild is exactly when this must be
+     * redone.
+     */
+    private fun children(): List<CustomFileEntry> {
+        val years = library.years()
+        joined?.let { (source, result) -> if (source === years) return result }
+        val result = MARKERS + years
+        joined = years to result
+        return result
+    }
 
     private companion object {
         /**
@@ -205,11 +235,10 @@ private class TextEntry(
 /**
  * One photo, read from the library when it is asked for.
  *
- * [sizeHint] is MediaStore's recorded size, used only if the real length
- * cannot be measured. The two can differ: without ACCESS_MEDIA_LOCATION the
+ * [sizeHint] is MediaStore's recorded size. Whether that is the size a peer
+ * will receive depends on [servesOriginal]: without ACCESS_MEDIA_LOCATION the
  * system hands out a copy with the GPS tags removed, which is shorter than the
- * file on disk. Measuring the stream we will actually read keeps the size in
- * the index honest either way.
+ * file on disk, and only then does the length have to be measured.
  */
 private class PhotoEntry(
     private val resolver: ContentResolver,
@@ -217,6 +246,12 @@ private class PhotoEntry(
     private val entryName: String,
     private val modified: Long,
     private val sizeHint: Long,
+    /**
+     * The URI was built with setRequireOriginal and we hold
+     * ACCESS_MEDIA_LOCATION, so reading it yields the file as it is on disk --
+     * nothing is redacted, and MediaStore's recorded size is what a peer gets.
+     */
+    private val servesOriginal: Boolean,
 ) : CustomFileEntry {
 
     @Volatile
@@ -233,7 +268,24 @@ private class PhotoEntry(
 
     override fun modifiedTime(): Long = modified
 
+    /**
+     * Syncthing asks for this once per file on every scan, so what it costs
+     * decides what a scan costs.
+     *
+     * Measuring means opening a descriptor, and on Android 11+ every one of
+     * those is a FUSE round trip into MediaProvider. Over a library of
+     * thousands of photos that is thousands of round trips per scan, repeated
+     * on every rebuild -- enough to wedge the process if a single one of them
+     * fails to come back, which is what a stuck FUSE request does.
+     *
+     * So when the bytes are served unredacted there is nothing to measure:
+     * MediaStore's size *is* the size of what a peer receives, and it was
+     * already read for free out of the same cursor row as [modified]. The
+     * redacted case still measures, because there the two genuinely differ.
+     */
     override fun bytes(): Long {
+        if (servesOriginal && sizeHint > 0) return sizeHint
+
         measured.takeIf { it >= 0 }?.let { return it }
         val length = runCatching {
             resolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
@@ -255,8 +307,36 @@ private class PhotoEntry(
 private class PhotoLibrary(private val context: Context) {
 
     private val lock = Any()
-    private var years: List<CustomFileEntry>? = null
-    private var builtAt = 0L
+
+    /**
+     * The built tree, published as one immutable value.
+     *
+     * A reader therefore sees either the whole previous library or the whole
+     * new one, and needs no lock to do it. That matters because [build] runs
+     * holding [lock] and enumerates the entire library: taking the lock to
+     * read would make every directory lookup -- and there is one per photo per
+     * scan -- wait for a full enumeration whenever one happened to be running.
+     */
+    private class Snapshot(
+        val years: List<CustomFileEntry>,
+        val builtAt: Long,
+        val builtFor: Long,
+    )
+
+    @Volatile
+    private var snapshot: Snapshot? = null
+
+    /** Rebuilds run here, off whatever thread happened to notice. */
+    private val rebuilds = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "dinghy-photo-library").apply { isDaemon = true }
+    }
+
+    /** Guarded by [lock]: whether a rebuild is already in flight. */
+    private var rebuilding = false
+
+    /** Called when a rebuild lands, so the folder can scan against it. */
+    @Volatile
+    var onRebuilt: (() -> Unit)? = null
 
     /**
      * Counts library changes, rather than flagging them.
@@ -268,23 +348,80 @@ private class PhotoLibrary(private val context: Context) {
      * change that lands mid-build leaves the result stale, as it is.
      */
     private val changes = AtomicLong()
-    private var builtFor = -1L
 
     fun invalidate() {
         changes.incrementAndGet()
     }
 
-    fun years(): List<CustomFileEntry> = synchronized(lock) {
-        val cached = years
-        val age = SystemClock.elapsedRealtime() - builtAt
-        if (cached != null && builtFor == changes.get() && age < MAX_AGE_MILLIS) return cached
+    /** Whether [candidate] is still the library as it stands. */
+    private fun isCurrent(candidate: Snapshot?): Boolean {
+        val current = candidate ?: return false
+        if (current.builtFor != changes.get()) return false
+        return SystemClock.elapsedRealtime() - current.builtAt < MAX_AGE_MILLIS
+    }
 
-        val startedAt = changes.get()
-        val built = build()
-        years = built
-        builtAt = SystemClock.elapsedRealtime()
-        builtFor = startedAt
-        return built
+    /**
+     * The library as it was last read, rebuilding behind the caller if that is
+     * no longer current.
+     *
+     * Deliberately answers from a stale tree rather than waiting: a rebuild
+     * enumerates every photo, and the callers here are a running scan, the
+     * streaming server answering a peer, and the browser -- none of which
+     * should stop for it. Staleness is bounded by the rebuild itself, which
+     * asks for a rescan as soon as it lands, so a stale answer is corrected
+     * rather than kept. The cost is that a change takes one more debounce
+     * interval to appear, which is the right trade against a folder that stops
+     * responding whenever the library is re-read.
+     */
+    fun years(): List<CustomFileEntry> {
+        snapshot?.let { current ->
+            if (!isCurrent(current)) rebuildLater()
+            return current.years
+        }
+
+        // Nothing has been read yet, so this one caller does have to wait:
+        // reporting an empty library would be taken for "every photo was
+        // deleted" and would propagate to the peers holding the backup.
+        return synchronized(lock) {
+            snapshot?.let { return@synchronized it.years }
+
+            val startedAt = changes.get()
+            val built = build()
+            snapshot = Snapshot(built, SystemClock.elapsedRealtime(), startedAt)
+            built
+        }
+    }
+
+    /**
+     * Enumerates the library on [rebuilds], at most one at a time.
+     *
+     * Coalesced rather than queued: while one is in flight, further callers
+     * keep the stale tree and add nothing, so a burst of changes costs one
+     * enumeration instead of one each.
+     */
+    private fun rebuildLater() {
+        synchronized(lock) {
+            if (rebuilding) return
+            rebuilding = true
+        }
+
+        rebuilds.execute {
+            val startedAt = changes.get()
+            val built = runCatching { build() }
+            synchronized(lock) { rebuilding = false }
+
+            built.onSuccess { years ->
+                snapshot = Snapshot(years, SystemClock.elapsedRealtime(), startedAt)
+                onRebuilt?.invoke()
+            }.onFailure { t ->
+                Log.w(TAG, "could not rebuild the photo library", t)
+                // Back to the blocking path, whose build() throws if the
+                // library really cannot be read any more -- a folder error
+                // changes no index. Keeping the old tree instead would hide a
+                // revoked permission behind a folder that still looks healthy.
+                snapshot = null
+            }
+        }
     }
 
     /**
@@ -370,6 +507,7 @@ private class PhotoLibrary(private val context: Context) {
                         entryName = name,
                         modified = seconds,
                         sizeHint = it.getLong(sizeColumn),
+                        servesOriginal = original,
                     ),
                 )
             }

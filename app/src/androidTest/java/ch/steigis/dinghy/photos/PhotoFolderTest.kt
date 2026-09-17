@@ -116,10 +116,59 @@ class PhotoFolderTest {
         assertEquals("a photo folder keeps settings in its path, not a path", CONFIG, path)
     }
 
+    /**
+     * A photo added after the folder is already running still reaches it.
+     *
+     * The library is re-read in the background, so the scan that notices a
+     * change is answered from the tree as it stood and only *starts* the
+     * rebuild. Nothing would ever see the new photo if the rebuild did not ask
+     * for a scan of its own once it landed, and that hand-off is invisible
+     * from the outside: the folder would simply stop gaining photos, which is
+     * a backup quietly missing everything taken since it was set up.
+     */
+    @Test
+    fun aPhotoAddedAfterTheFirstScanStillAppears() {
+        val first = insertPhoto(name)
+        runBlocking { SyncEngine.addPhotoFolder(folderId) }
+
+        val (year, month) = monthOf(first.uri)
+        await("the first photo") {
+            SyncEngine.browse(folderId, "$year/$month/").firstOrNull { it.name == name }
+        }
+
+        // Past the rescan addPhotoFolder schedules a couple of seconds after
+        // creating the folder. Without this wait that scan picks the next
+        // photo up, the test passes in two seconds, and the library-change
+        // path it is supposed to cover is never exercised at all.
+        runBlocking { delay(SETTLE_MILLIS) }
+
+        val laterName = "dinghy-test-later-${System.currentTimeMillis()}.jpg"
+        val later = insertPhoto(laterName)
+        val (laterYear, laterMonth) = monthOf(later.uri)
+
+        // Generous, because how long this takes depends on when the rebuild
+        // lands: if it finishes before the scan reaches the month directory
+        // that scan already sees the photo, and otherwise it takes the second
+        // scan, the one the rebuild asks for -- another debounce later.
+        val entry = await("the later photo", REBUILD_TIMEOUT_MS) {
+            SyncEngine.browse(folderId, "$laterYear/$laterMonth/")
+                .firstOrNull { it.name == laterName }
+        }
+        assertEquals(
+            "indexed size differs from the photo",
+            later.bytes.size.toLong(),
+            entry.size,
+        )
+    }
+
     /** Polls until the engine has scanned; a scan is asynchronous. */
-    private fun await(what: String, read: suspend () -> EntryInfo?): EntryInfo {
+    private fun await(
+        what: String,
+        timeoutMillis: Long = SCAN_TIMEOUT_MS,
+        read: suspend () -> EntryInfo?,
+    ): EntryInfo {
         val found = runBlocking {
-            withTimeoutOrNull(SCAN_TIMEOUT_MS) {
+            withTimeoutOrNull(timeoutMillis) {
                 var entry = read()
                 while (entry == null) {
                     delay(POLL_MILLIS)
@@ -131,16 +180,30 @@ class PhotoFolderTest {
         return requireNotNull(found) { "$what never appeared in the folder" }
     }
 
-    /** Where the folder should put [uri], by the same rule the tree uses. */
+    /**
+     * Where the folder should put [uri], by the same rule the tree uses.
+     *
+     * All three columns, in the same order the tree falls back through them.
+     * DATE_TAKEN and DATE_MODIFIED are both still zero for a moment after an
+     * insert, and reading only those put a freshly added photo at epoch zero
+     * -- so this looked in 1970/01 while the folder had filed it under the
+     * real month, and the photo appeared to have gone missing.
+     */
     private fun monthOf(uri: Uri): Pair<String, String> {
         val projection = arrayOf(
             MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.DATE_MODIFIED,
+            MediaStore.Images.Media.DATE_ADDED,
         )
         val seconds = requireNotNull(resolver.query(uri, projection, null, null, null)).use {
             require(it.moveToFirst()) { "the photo is not in the library" }
             val taken = it.getLong(0)
-            if (taken > 0) taken / 1000 else it.getLong(1)
+            val modified = it.getLong(1)
+            when {
+                taken > 0 -> taken / 1000
+                modified > 0 -> modified
+                else -> it.getLong(2)
+            }
         }
         val date = Instant.ofEpochSecond(seconds).atZone(ZoneOffset.UTC)
         return "%04d".format(date.year) to "%02d".format(date.monthValue)
@@ -174,6 +237,12 @@ class PhotoFolderTest {
     private companion object {
         const val CONFIG = """{"version":1}"""
         const val SCAN_TIMEOUT_MS = 90_000L
+
+        /** Long enough for the folder's own post-creation scan to have run. */
+        const val SETTLE_MILLIS = 8_000L
+
+        /** Two rescan debounces plus the rebuild between them. */
+        const val REBUILD_TIMEOUT_MS = 150_000L
         const val POLL_MILLIS = 1_000L
     }
 }

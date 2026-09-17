@@ -47,7 +47,8 @@ import kotlinx.coroutines.withContext
  */
 private enum class PreviewKind { Image, Text, Pdf, None }
 
-private val imageExtensions =
+/** Shared with the browser's grid, which shows these as thumbnails. */
+internal val imageExtensions =
     setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif")
 
 private val textExtensions = setOf(
