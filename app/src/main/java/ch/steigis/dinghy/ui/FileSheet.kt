@@ -2,6 +2,7 @@ package ch.steigis.dinghy.ui
 
 import android.content.Intent
 import android.util.Log
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,10 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import ch.steigis.dinghy.R
 import ch.steigis.dinghy.engine.EntryInfo
 import ch.steigis.dinghy.engine.SyncEngine
+import ch.steigis.dinghy.provider.DinghyDocumentsProvider
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -40,8 +41,9 @@ import kotlinx.coroutines.launch
 /**
  * Actions for one file.
  *
- * "Open" streams through the engine's localhost server, which pulls blocks from
- * peers as the reader seeks -- the file need never have been downloaded.
+ * "Open" hands the file to another app as a content URI backed by
+ * DinghyDocumentsProvider, which streams blocks from peers as the reader seeks
+ * -- the file need never have been downloaded.
  * "Download a copy" is a one-off save that does not change what the folder
  * keeps in sync, unlike pinning.
  */
@@ -103,21 +105,22 @@ fun FileSheet(folderId: String, entry: EntryInfo, onDismiss: () -> Unit) {
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
-                    scope.launch {
-                        val url = runCatching { SyncEngine.onDemandUrl(folderId, entry.path) }
-                            .getOrNull()
-                        if (url.isNullOrEmpty()) {
-                            status = "Could not build a stream URL"
-                            return@launch
-                        }
-                        Log.i("FileSheet", "on-demand url for ${entry.path}: $url")
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(url.toUri(), entry.mimeTypeOrDefault())
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        runCatching { context.startActivity(intent) }.onFailure {
-                            status = "No app can open this type"
-                        }
+                    // Deliberately *not* the engine's http: stream URL: viewers
+                    // register intent filters for content: and file:, so that
+                    // URL resolves to nothing and every file looks unopenable.
+                    // The content URI points at our own DocumentsProvider,
+                    // which serves the same stream behind a file descriptor.
+                    val uri = DinghyDocumentsProvider.documentUri(folderId, entry.path)
+                    Log.i("FileSheet", "opening ${entry.path} as $uri")
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, entry.mimeTypeOrDefault())
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching {
+                        context.startActivity(Intent.createChooser(intent, entry.name))
+                    }.onFailure {
+                        Log.w("FileSheet", "no viewer for ${entry.path}", it)
+                        status = "No app on this device can open this file"
                     }
                 }) { Text("Open") }
 
@@ -161,6 +164,8 @@ private fun EntryInfo.mimeTypeOrDefault(): String {
         "png" -> "image/png"
         "pdf" -> "application/pdf"
         "txt", "md" -> "text/plain"
-        else -> "*/*"
+        // MimeTypeMap knows far more than this list; "*/*" is the last resort,
+        // and matches any viewer rather than none.
+        else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
     }
 }
