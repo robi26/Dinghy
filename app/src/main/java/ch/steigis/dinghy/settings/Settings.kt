@@ -34,6 +34,17 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_ONLY_CHARGING, false)
         set(value) = prefs.edit().putBoolean(KEY_ONLY_CHARGING, value).apply()
 
+    /**
+     * Show the file browser as a grid rather than a list.
+     *
+     * Persisted rather than held in the composition: the browser is pushed
+     * afresh for every directory level, so a choice kept in UI state would be
+     * forgotten the moment you opened a subfolder.
+     */
+    var browserGrid: Boolean
+        get() = prefs.getBoolean(KEY_BROWSER_GRID, false)
+        set(value) = prefs.edit().putBoolean(KEY_BROWSER_GRID, value).apply()
+
     /** Whether the user has been through onboarding. */
     var onboarded: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
@@ -47,5 +58,6 @@ class Settings(context: Context) {
         const val KEY_SYNC_ON_METERED = "sync_on_metered"
         const val KEY_ONLY_CHARGING = "only_charging"
         const val KEY_ONBOARDED = "onboarded"
+        const val KEY_BROWSER_GRID = "browser_grid"
     }
 }

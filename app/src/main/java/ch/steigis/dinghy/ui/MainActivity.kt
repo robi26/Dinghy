@@ -123,9 +123,14 @@ private sealed interface Detail {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DinghyApp() {
+    val context = LocalContext.current
     var tab by remember { mutableStateOf(Tab.Devices) }
     var stack by remember { mutableStateOf<List<Detail>>(emptyList()) }
     val detail = stack.lastOrNull()
+    // Hoisted out of BrowserScreen because the control for it is in the app
+    // bar, which this owns, and because every directory level is its own
+    // BrowserScreen -- the choice has to outlive any one of them.
+    var browserGrid by remember { mutableStateOf(Settings(context).browserGrid) }
     // Holds each tab's saveable state while it is off screen, so switching tabs
     // -- or pushing the browser on top of one -- does not reset what the user
     // had typed or how far they had scrolled.
@@ -180,9 +185,36 @@ private fun DinghyApp() {
                 },
                 actions = {
                     if (detail is Detail.Browse) {
-                        TextButton(onClick = {
+                        // An icon rather than a text button: with three
+                        // actions in this bar, the word "Search" costs enough
+                        // width to ellipsise the folder name beside it.
+                        IconButton(onClick = {
                             stack = stack + Detail.Search(detail.folderId, detail.label)
-                        }) { Text(stringResource(R.string.action_search)) }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_search),
+                                contentDescription = stringResource(R.string.action_search),
+                            )
+                        }
+                        IconButton(onClick = {
+                            browserGrid = !browserGrid
+                            Settings(context).browserGrid = browserGrid
+                        }) {
+                            // Shows the layout you would switch *to*, which is
+                            // what makes a single button read as a toggle.
+                            Icon(
+                                painter = painterResource(
+                                    if (browserGrid) R.drawable.ic_list else R.drawable.ic_grid,
+                                ),
+                                contentDescription = stringResource(
+                                    if (browserGrid) {
+                                        R.string.action_view_list
+                                    } else {
+                                        R.string.action_view_grid
+                                    },
+                                ),
+                            )
+                        }
                         IconButton(onClick = {
                             stack = stack + Detail.FolderSettings(detail.folderId, detail.label)
                         }) {
@@ -270,6 +302,7 @@ private fun DinghyApp() {
                 BrowserScreen(
                     folderId = detail.folderId,
                     prefix = detail.prefix,
+                    grid = browserGrid,
                     onOpenDirectory = { childPrefix ->
                         stack = stack + Detail.Browse(detail.folderId, detail.label, childPrefix)
                     },
