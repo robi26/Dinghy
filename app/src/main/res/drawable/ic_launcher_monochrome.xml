@@ -7,44 +7,85 @@
 
     <!--
       Themed-icon layer for Android 13+. The system ignores these colours and
-      tints the layer by the wallpaper, so the mark has to survive as a
-      silhouette: the gap between the sails is what keeps it from collapsing
-      into one blob, and the water is held at a lower alpha so it reads as
-      secondary rather than as part of the hull. Geometry is kept identical to
-      ic_launcher_foreground so the two never drift apart.
+      tints the layer by the wallpaper, so the only tools left are shape and
+      alpha. The foreground hides the mainsail behind the jib by painting over
+      it in the background colour; here that would paint a tinted blob, so the
+      mainsail is clipped to everything outside the jib instead (a full square
+      with the jib wound the other way cut out of it). The seams keep their low
+      alpha so they read as texture, not outline. Geometry is otherwise
+      identical to ic_launcher_foreground so the two never drift apart.
     -->
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="1.18"
-        android:scaleY="1.18">
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:translateY="-1.6">
+
+        <group>
+            <clip-path android:pathData="M0,0 L108,0 L108,108 L0,108 Z M31,62 L60,62 C57,51 53,41 50,32 Z" />
+
+            <group>
+                <clip-path android:pathData="M56,24 C65,32 73,46 78,62 L56,62 Z" />
+                <path
+                    android:pathData="M50,34 Q67,31 84,32 M50,43 Q67,40 84,41 M50,52 Q67,49 84,50"
+                    android:strokeColor="#FF000000"
+                    android:strokeAlpha="0.35"
+                    android:strokeWidth="1" />
+            </group>
+
+            <path
+                android:pathData="M56,24 C65,32 73,46 78,62 L56,62 Z"
+                android:strokeColor="#FF000000"
+                android:strokeWidth="3"
+                android:strokeLineJoin="round" />
+        </group>
+
+        <group>
+            <clip-path android:pathData="M50,32 C53,41 57,51 60,62 L31,62 Z" />
+            <path
+                android:pathData="M26,42 Q45,39 64,40 M26,52 Q45,49 64,50"
+                android:strokeColor="#FF000000"
+                android:strokeAlpha="0.35"
+                android:strokeWidth="1" />
+        </group>
 
         <path
-            android:pathData="M52,36 C47,41 41,47 36,52 L52,52 Z"
-            android:fillColor="#FF000000"
+            android:pathData="M50,32 C53,41 57,51 60,62 L31,62 Z"
             android:strokeColor="#FF000000"
-            android:strokeWidth="2.8"
+            android:strokeWidth="3"
             android:strokeLineJoin="round" />
 
         <path
-            android:pathData="M56,30 C64,36 70,45 74,52 L56,52 Z"
-            android:fillColor="#FF000000"
+            android:pathData="M27,67 L81,67 C78.5,77 68,82 54,82 C40,82 29.5,77 27,67 Z"
             android:strokeColor="#FF000000"
-            android:strokeWidth="2.8"
-            android:strokeLineJoin="round" />
-
-        <path
-            android:pathData="M32,54 L76,54 C74.5,63 66,68.5 54,68.5 C42,68.5 33.5,63 32,54 Z"
-            android:fillColor="#FF000000"
-            android:strokeColor="#FF000000"
-            android:strokeWidth="1.8"
-            android:strokeLineJoin="round" />
-
-        <path
-            android:pathData="M37,75 c4.5,-3 9,-3 13.5,0 c4.5,3 9,3 13.5,0 c3,-2 6,-2.4 9,-1"
-            android:strokeColor="#FF000000"
-            android:strokeAlpha="0.5"
             android:strokeWidth="3.2"
+            android:strokeLineJoin="round" />
+
+        <path
+            android:pathData="M52.4,24 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 Z"
+            android:fillColor="#FF000000" />
+
+        <path
+            android:pathData="M58,86.5 C46,86.5 46,93 34,93"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="2.6"
             android:strokeLineCap="round" />
+        <path
+            android:pathData="M31.4,93 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z"
+            android:fillColor="#FF000000" />
+    </group>
+
+    <group
+        android:translateX="73"
+        android:translateY="35"
+        android:scaleX="0.72"
+        android:scaleY="0.72">
+        <path
+            android:pathData="M-5.5,-1 A5.6,5.6 0 0,1 4.3,-3.6 M4.6,-6.4 L4.3,-3.6 L1.5,-3.9 M5.5,1 A5.6,5.6 0 0,1 -4.3,3.6 M-4.6,6.4 L-4.3,3.6 L-1.5,3.9"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
     </group>
 </vector>

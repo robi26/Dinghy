@@ -6,52 +6,104 @@
     android:viewportHeight="108">
 
     <!--
-      A dinghy under sail. There is no mast: the sails are separated by a gap of
-      background instead, which reads as one at icon sizes and avoids a heavy
-      dark bar through the middle of the mark.
+      A dinghy drawn in Overprint's line style: teal and blue outlines with
+      faint seams standing in for its map grid, white for the hull, and a wake
+      that runs from a start dot to the teal dot at the masthead the way
+      Overprint's track does. A small sync mark takes the corner spot where
+      Overprint keeps its crosshair.
+
+      The jib overlaps the mainsail and is filled and stroked in the
+      background colour, so it cuts the mainsail's lines with a thin gap rather
+      than crossing them.
 
       Only the centre 72dp of the 108dp layer is guaranteed visible, so the
-      whole mark is drawn small and scaled up about its own centre. Every point
-      stays within ~30dp of centre, comfortably inside the 36dp radius a
-      circular mask leaves. Corners are rounded by stroking each shape in its
-      own fill colour rather than by fattening the path data.
+      boat is drawn large and scaled down about the centre, nudged up a little
+      to balance the wake. Every point stays within ~34dp of centre, inside the
+      36dp radius a circular mask leaves.
     -->
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="1.18"
-        android:scaleY="1.18">
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:translateY="-1.6">
 
-        <!-- jib -->
-        <path
-            android:pathData="M52,36 C47,41 41,47 36,52 L52,52 Z"
-            android:fillColor="#FFFB7185"
-            android:strokeColor="#FFFB7185"
-            android:strokeWidth="2.8"
-            android:strokeLineJoin="round" />
+        <!-- mainsail seams, clipped to the sail -->
+        <group>
+            <clip-path android:pathData="M56,24 C65,32 73,46 78,62 L56,62 Z" />
+            <path
+                android:pathData="M50,34 Q67,31 84,32 M50,43 Q67,40 84,41 M50,52 Q67,49 84,50"
+                android:strokeColor="#FF34D9B5"
+                android:strokeAlpha="0.35"
+                android:strokeWidth="1" />
+        </group>
 
         <!-- mainsail -->
         <path
-            android:pathData="M56,30 C64,36 70,45 74,52 L56,52 Z"
-            android:fillColor="#FFFBBF24"
-            android:strokeColor="#FFFBBF24"
-            android:strokeWidth="2.8"
+            android:pathData="M56,24 C65,32 73,46 78,62 L56,62 Z"
+            android:strokeColor="#FF34D9B5"
+            android:strokeWidth="3"
+            android:strokeLineJoin="round" />
+
+        <!-- jib knockout: hides the mainsail where the jib overlaps it -->
+        <path
+            android:pathData="M50,32 C53,41 57,51 60,62 L31,62 Z"
+            android:fillColor="#FF0B1B33"
+            android:strokeColor="#FF0B1B33"
+            android:strokeWidth="5"
+            android:strokeLineJoin="round" />
+
+        <!-- jib seams, clipped to the sail -->
+        <group>
+            <clip-path android:pathData="M50,32 C53,41 57,51 60,62 L31,62 Z" />
+            <path
+                android:pathData="M26,42 Q45,39 64,40 M26,52 Q45,49 64,50"
+                android:strokeColor="#FF1D6BF0"
+                android:strokeAlpha="0.5"
+                android:strokeWidth="1" />
+        </group>
+
+        <!-- jib -->
+        <path
+            android:pathData="M50,32 C53,41 57,51 60,62 L31,62 Z"
+            android:strokeColor="#FF1D6BF0"
+            android:strokeWidth="3"
             android:strokeLineJoin="round" />
 
         <!-- hull -->
         <path
-            android:pathData="M32,54 L76,54 C74.5,63 66,68.5 54,68.5 C42,68.5 33.5,63 32,54 Z"
-            android:fillColor="#FFFFFFFF"
+            android:pathData="M27,67 L81,67 C78.5,77 68,82 54,82 C40,82 29.5,77 27,67 Z"
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="1.8"
+            android:strokeWidth="3.2"
             android:strokeLineJoin="round" />
 
-        <!-- water -->
+        <!-- masthead: the end of the track -->
         <path
-            android:pathData="M37,75 c4.5,-3 9,-3 13.5,0 c4.5,3 9,3 13.5,0 c3,-2 6,-2.4 9,-1"
+            android:pathData="M52.4,24 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 Z"
+            android:fillColor="#FF34D9B5" />
+
+        <!-- wake, ending in the start dot -->
+        <path
+            android:pathData="M58,86.5 C46,86.5 46,93 34,93"
             android:strokeColor="#FFFFFFFF"
-            android:strokeAlpha="0.55"
-            android:strokeWidth="3.2"
+            android:strokeWidth="2.6"
             android:strokeLineCap="round" />
+        <path
+            android:pathData="M31.4,93 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z"
+            android:fillColor="#FFFFFFFF" />
+    </group>
+
+    <!-- sync mark -->
+    <group
+        android:translateX="73"
+        android:translateY="35"
+        android:scaleX="0.72"
+        android:scaleY="0.72">
+        <path
+            android:pathData="M-5.5,-1 A5.6,5.6 0 0,1 4.3,-3.6 M4.6,-6.4 L4.3,-3.6 L1.5,-3.9 M5.5,1 A5.6,5.6 0 0,1 -4.3,3.6 M-4.6,6.4 L-4.3,3.6 L-1.5,3.9"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
     </group>
 </vector>
