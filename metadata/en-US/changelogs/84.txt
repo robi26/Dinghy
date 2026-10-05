@@ -1,0 +1,4 @@
+A new icon.
+
+* The app icon is redrawn to match Overprint: a navy background with outlined sails, a white hull and a wake
+* Themed icons on Android 13 and later get the same new boat
